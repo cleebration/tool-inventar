@@ -65,7 +65,7 @@
   var app = $("#app"), leiste = $("cleebration-leiste");
   var W = { suche: $("#w-suche"), neu: $("#w-neu"), orte: $("#w-orte"), teilen: $("#w-teilen"), sammlung: $("#w-sammlung") };
   var S = { start: null, akt: null, ansicht: "kacheln", filter: { t: [], o: "", s: "" } };
-  try { S.ansicht = localStorage.getItem("inv-ansicht") || "kacheln"; } catch (e) {}
+  // Gegenstände immer als Kacheln wie die Sammlungen (Wunsch Chris 2026-11-04) – keine Listenansicht mehr
   // Titel der Werkzeuge in der Sprache der Seite
   W.suche.title = W.suche.placeholder = L === "en" ? "Search" : "Suchen"; W.neu.title = T.neu; W.orte.title = T.orte; W.teilen.title = T.teilen; W.sammlung.title = T.einstellungen;
   if (L === "en") $("cleebration-fuss").setAttribute("eigen", "Create your own inventory for free");
@@ -315,9 +315,8 @@
         (S.filter.o ? '<button type="button" class="chip an" data-f="o" data-w="">📍 ' + esc(ortPfad(S.filter.o)) + " ✕</button>" : "") +
         (tags.length ? '<button type="button" class="chip" data-tag="" aria-pressed="' + !S.filter.t.length + '">' + esc(T.alle) + "</button>" + tags.map(tagChip).join("") : "") +
         (sts.length > 1 ? sts.map(function (st) { return chip("s", st === S.filter.s ? "" : st, T.st[st]); }).join("") : "") +
-        '<button type="button" class="chip ansicht" id="ansicht" title="' + esc(T.ansicht) + '" aria-label="' + esc(T.ansicht) + '">' + (S.ansicht === "liste" ? ICON.kacheln : ICON.liste) + "</button>" +
       "</nav></header>" +
-      (liste.length ? '<section class="dinge ' + (S.ansicht === "liste" ? "liste" : "raster") + (sortierbar ? " sortierbar" : "") + '">' + liste.map(function (g) {
+      (liste.length ? '<section class="dinge ' + "raster" + (sortierbar ? " sortierbar" : "") + '">' + liste.map(function (g) {
         var bild = g.fotos[0] ? '<img loading="lazy" draggable="false" src="/f/' + s.id + "/" + g.id + "/" + g.fotos[0] + '" alt="">' : platzhalter(s.vorlage, true);
         return '<a class="karte ding' + (g.status === "verkauft" || g.status === "weg" ? " blass" : "") + '" draggable="false" data-id="' + esc(g.id) + '" href="#/s/' + s.id + "/g/" + g.id + '">' +
           (sortierbar ? '<span class="griff" title="' + esc(T.ziehen) + '" aria-hidden="true">⋮⋮</span>' : "") +
@@ -328,7 +327,6 @@
       }).join("") + "</section>"
       : '<p class="leer">' + esc(j.gegenstaende.length ? T.nichtsGefunden : T.leer) + "</p>");
 
-    $("#ansicht").onclick = function () { S.ansicht = S.ansicht === "liste" ? "kacheln" : "liste"; try { localStorage.setItem("inv-ansicht", S.ansicht); } catch (e) {} zeichneSammlung(); };
     [].forEach.call(app.querySelectorAll(".chip[data-f]"), function (b) {
       b.onclick = function () { S.filter[b.dataset.f] = b.dataset.f === "s" ? b.dataset.w : (S.filter[b.dataset.f] === b.dataset.w ? "" : b.dataset.w); if (b.dataset.f === "o" && !b.dataset.w) history.replaceState(null, "", "#/s/" + s.id); zeichneSammlung(); };
     });
