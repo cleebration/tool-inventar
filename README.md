@@ -21,7 +21,7 @@ Konzept, Preise und Stand: Google Drive `1! claude/05 Projekte/Tool Inventar` (K
 | Kit (nie hier ändern – Quelle `store/public/kit/`) | `src/cleebration-kit.js` (KIT_VERSION 1) |
 | App (eine Seite, Routen im Hash) | `public/index.html`, `public/app.js`, `public/app.css` |
 | D1 `inventar` | `migrations/0001_kit_sitzungen.sql`, `migrations/0002_inventar.sql` |
-| R2 `inventar-fotos` | Fotos unter `f/<sammlung>/<gegenstand>/<datei>.jpg` |
+| R2 `inventar-fotos-eu` (Westeuropa) | Fotos unter `f/<sammlung>/<gegenstand>/<datei>.jpg` |
 | Cron 03:17 UTC | `kit.aufraeumen` – Sitzungen + gelöschte Konten (samt Fotos) |
 
 Grenzen kommen aus dem Store (`/admin/sets` → Inventar): `sammlungen_frei`, `gegenstaende_frei`, `fotos_frei`, `fotos_plus`; Set `plus` hebt sie auf. Rückfall im Code: 3 / 250 / 5 / 20. Admins (Rolle ab `admin`) ohne Grenzen.
@@ -36,7 +36,7 @@ npm test        # Syntax + wrangler dev mit lokaler D1/R2 + nachgebauter Store (
 ```
 
 ## Live schalten (Freigabe Chris)
-1. ~~D1 `inventar` und R2 `inventar-fotos` anlegen, `database_id` eintragen, Migrationen~~ – erledigt 2026-11-04 (D1 `417c04fe-…`, Westeuropa; R2 `inventar-fotos`; `d1_migrations` kennt 0001+0002).
+1. ~~D1 `inventar` und R2 `inventar-fotos` anlegen, `database_id` eintragen, Migrationen~~ – erledigt 2026-11-04 (D1 `417c04fe-…`, Westeuropa; R2 `inventar-fotos-eu`, Westeuropa; `d1_migrations` kennt 0001+0002). Der leere Bucket `inventar-fotos` (Nordamerika) wird nicht genutzt.
 2. Store `/admin`: Produkt + Tool `inventar` (Art Konto-Tool), Tool-Schlüssel → Secret `STORE_SCHLUESSEL` im Worker; Sets Basis (gratis) und Plus (19 €/Jahr, Schalter „bezahlt“ ab Verkaufsstart); Werte wie oben.
 3. Cloudflare Workers Builds mit diesem Repo verbinden (Push auf `main` deployt), Custom Domain `inventar.cleebration.com`.
 4. Kachel-Check, mit beiden Konten prüfen, Kachel sichtbar schalten.

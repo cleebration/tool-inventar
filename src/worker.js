@@ -1,6 +1,6 @@
 // Tool Inventar · inventar.cleebration.com
 // Konto-Tool im cleebration store (Tool-Grundsätze 6–12): Kit für Anmeldung, Sets, Meine Sachen, Ereignisse, Moderation.
-// D1 „inventar“ (Sammlungen, Orte, Gegenstände), R2 „inventar-fotos“ (Fotos, im Browser verkleinert, ohne EXIF).
+// D1 „inventar“ (Sammlungen, Orte, Gegenstände), R2 „inventar-fotos-eu“ (Fotos, im Browser verkleinert, ohne EXIF).
 
 import { kit, json, esc, jetzt, zufall, sprache, nurIntern } from "./cleebration-kit.js";
 import { VORLAGEN, STATUS, felderAus, felderPruefen } from "./vorlagen.js";

@@ -1,4 +1,4 @@
--- Tool Inventar · Sammlungen, Orte, Gegenstände (Fotos in R2 „inventar-fotos“)
+-- Tool Inventar · Sammlungen, Orte, Gegenstände (Fotos in R2 „inventar-fotos-eu“)
 CREATE TABLE IF NOT EXISTS sammlungen (
   id          TEXT PRIMARY KEY,
   konto_id    TEXT NOT NULL,

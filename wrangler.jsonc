@@ -24,7 +24,7 @@
     }
   ],
   "r2_buckets": [
-    { "binding": "FOTOS", "bucket_name": "inventar-fotos" }
+    { "binding": "FOTOS", "bucket_name": "inventar-fotos-eu" } // Westeuropa (WEUR), angelegt 2026-11-04
   ],
   // nachts: abgelaufene Sitzungen + gelöschte Konten aufräumen (DSGVO, Kit)
   "triggers": { "crons": ["17 3 * * *"] }
