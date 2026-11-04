@@ -83,6 +83,7 @@ async function weiter(request, env, ctx, k) {
     const neu = new HTMLRewriter()
       .on("html", { element: el => el.setAttribute("lang", lang) })
       .on("cleebration-leiste", { element: el => { el.setAttribute("name", se.name); el.setAttribute("lang", lang); } })
+      .on("cleebration-fuss", { element: el => el.setAttribute("eigen", lang === "en" ? "Create your own inventory for free" : "Eigenes Inventar gratis erstellen") })
       .transform(roh);
     return k.sicher(neu, { html: true });
   }
