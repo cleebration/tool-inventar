@@ -26,7 +26,7 @@
       sammlungLoeschen: "Sammlung löschen", loeschenFrage: "Zum Löschen den Namen der Sammlung eintippen:", ja: "ja", nein: "nein",
       grenze: { sammlungen: "Mehr Sammlungen gibt es mit Inventar Plus.", gegenstaende: "Mehr Gegenstände gibt es mit Inventar Plus.", fotos: "Mehr Fotos je Gegenstand gibt es mit Inventar Plus." },
       zumStore: "Im Store ansehen", qr: "QR-Code", qrOrt: "QR für diesen Ort – aufkleben, scannen, Inhalt sehen", qrDing: "QR für diesen Gegenstand",
-      inOrt: "Inhalt von", ansicht: "Kacheln / Liste", wert: "Gesamt-Schätzwert", laedt: "Lädt …", foto: "Foto", fotoLaedt: "Foto wird hochgeladen …",
+      inOrt: "Inhalt von", ansicht: "Kacheln / Liste", namePlatz: "Wie heißt der Gegenstand?", eigene: "eigene", ortNeuPlatz: "z. B. Wohnzimmer", anlegen: "Anlegen", details: "Details", wertBelege: "Wert, Kauf & Versicherung", fotoHier: "Foto hinzufügen", wert: "Gesamt-Schätzwert", laedt: "Lädt …", foto: "Foto", fotoLaedt: "Foto wird hochgeladen …",
     },
     en: {
       sammlungen: "Your collections", neueSammlung: "New collection", gegenstaende: "items", vorlageWaehlen: "What is the collection for?",
@@ -46,7 +46,7 @@
       sammlungLoeschen: "Delete collection", loeschenFrage: "Type the collection's name to delete it:", ja: "yes", nein: "no",
       grenze: { sammlungen: "More collections with Inventory Plus.", gegenstaende: "More items with Inventory Plus.", fotos: "More photos per item with Inventory Plus." },
       zumStore: "See in store", qr: "QR code", qrOrt: "QR for this place – stick it on, scan, see contents", qrDing: "QR for this item",
-      inOrt: "Contents of", ansicht: "Grid / list", wert: "Total estimate", laedt: "Loading …", foto: "Photo", fotoLaedt: "Uploading photo …",
+      inOrt: "Contents of", ansicht: "Grid / list", namePlatz: "What is it called?", eigene: "custom", ortNeuPlatz: "e.g. Living room", anlegen: "Add", details: "Details", wertBelege: "Value, purchase & insurance", fotoHier: "Add photo", wert: "Total estimate", laedt: "Loading …", foto: "Photo", fotoLaedt: "Uploading photo …",
     },
   }[L];
 
@@ -234,7 +234,7 @@
         '<button type="button" class="chip ansicht" id="ansicht" title="' + esc(T.ansicht) + '" aria-label="' + esc(T.ansicht) + '">' + (S.ansicht === "liste" ? ICON.kacheln : ICON.liste) + "</button>" +
       "</nav></header>" +
       (liste.length ? '<section class="' + (S.ansicht === "liste" ? "liste" : "raster") + '">' + liste.map(function (g) {
-        var bild = g.fotos[0] ? '<img loading="lazy" src="/f/' + s.id + "/" + g.id + "/" + g.fotos[0] + '" alt="">' : '<span class="ohne">' + ((S.start && S.start.vorlagen[s.vorlage] || {}).icon || "📦") + "</span>";
+        var bild = g.fotos[0] ? '<img loading="lazy" src="/f/' + s.id + "/" + g.id + "/" + g.fotos[0] + '" alt="">' : platzhalter(s.vorlage, true);
         return '<a class="karte ding' + (g.status === "verkauft" || g.status === "weg" ? " blass" : "") + '" href="#/s/' + s.id + "/g/" + g.id + '"><span class="bild">' + bild + '</span><span class="text"><small>' + esc(nrText(g)) +
           (g.status !== "vorhanden" ? " · " + esc(T.st[g.status]) : "") + "</small><b>" + esc(g.name || "—") + "</b><small>" + esc([g.kategorie, ortPfad(g.ort_id)].filter(Boolean).join(" · ")) + "</small></span></a>";
       }).join("") + "</section>"
@@ -247,6 +247,22 @@
   }
 
   /* ---------- Gegenstand ---------- */
+  /* ---------- Stilisiertes Bild je Vorlage (Platzhalter, bis ein Foto da ist) ---------- */
+  var MOTIV = {
+    wertsachen: '<rect x="34" y="26" width="92" height="108" rx="6"/><rect x="46" y="38" width="68" height="84" rx="3"/><path d="M52 112l18-26 14 16 10-12 16 22z"/><circle cx="96" cy="58" r="7"/>',
+    werkzeug: '<path d="M44 116l46-46"/><path d="M84 54a20 20 0 0 1 26-26l-14 14 4 10 10 4 14-14a20 20 0 0 1-26 26z"/><path d="M38 122l10-10 8 8-10 10z"/>',
+    instrumente: '<path d="M62 118V46l52-12v70"/><circle cx="50" cy="118" r="12"/><circle cx="102" cy="104" r="12"/><path d="M62 64l52-12"/>',
+    kisten: '<path d="M80 30l48 22v56l-48 22-48-22V52z"/><path d="M32 52l48 22 48-22M80 74v56"/><path d="M56 41l48 22v18"/>',
+    frei: '<path d="M80 30l48 22v56l-48 22-48-22V52z"/><path d="M32 52l48 22 48-22M80 74v56"/>',
+  };
+  function platzhalter(vorlage, klein) {
+    var m = MOTIV[vorlage] || MOTIV.frei;
+    return '<svg class="motiv' + (klein ? " klein" : "") + '" viewBox="0 0 160 160" aria-hidden="true"><defs><linearGradient id="mg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" style="stop-color:var(--m1)"/><stop offset="1" style="stop-color:var(--m2)"/></linearGradient></defs>' +
+      '<rect width="160" height="160" rx="28" fill="url(#mg)"/><g fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" opacity=".85">' + m + "</g></svg>";
+  }
+
+  /* ---------- Gegenstand ---------- */
+  var GELD = ["kaufpreis", "kaufdatum", "wert_von", "wert_bis", "wert_quelle", "gutachten", "versicherung", "garantie", "seriennummer", "verliehen"];
   function gegenstand(sid, gid) {
     return sammlungLaden(sid).then(function (j) {
       var g = j.gegenstaende.find(function (x) { return x.id === gid; });
@@ -256,37 +272,54 @@
       var kats = (v.kategorien || []).slice();
       j.gegenstaende.forEach(function (x) { if (x.kategorie && kats.indexOf(x.kategorie) < 0) kats.push(x.kategorie); });
       document.title = (g.name || nrText(g)) + " · Inventar";
+      var felder = s.felder.filter(function (f) { return !f.aus; });
+      var details = felder.filter(function (f) { return GELD.indexOf(f.id) < 0; }), geld = felder.filter(function (f) { return GELD.indexOf(f.id) >= 0; });
 
       function feldHtml(f) {
-        var w = g.werte[f.id], id = "f-" + f.id, lab = '<label for="' + id + '">' + esc(feldName(f)) + (f.oeffentlich && s.sicht !== "privat" ? ' <span class="sicht" title="' + esc(T.oeff) + '">👁</span>' : "") + "</label>";
-        if (f.typ === "lang") return '<div class="feld breit">' + lab + '<textarea id="' + id + '" data-w="' + f.id + '" rows="3">' + esc(w) + "</textarea></div>";
-        if (f.typ === "janein") return '<div class="feld">' + lab + '<select id="' + id + '" data-w="' + f.id + '"><option value=""></option><option value="ja"' + (w === true ? " selected" : "") + ">" + T.ja + '</option><option value="nein"' + (w === false ? " selected" : "") + ">" + T.nein + "</option></select></div>";
+        var w = g.werte[f.id], id = "f-" + f.id, auge = f.oeffentlich && s.sicht !== "privat" ? ' <span class="sicht" title="' + esc(T.oeff) + '">👁</span>' : "";
+        var lab = '<label for="' + id + '">' + esc(feldName(f)) + auge + "</label>";
+        if (f.typ === "lang") return '<div class="feld breit">' + lab + '<textarea id="' + id + '" data-w="' + f.id + '" rows="2" placeholder="' + esc(feldName(f)) + '">' + esc(w) + "</textarea></div>";
+        if (f.typ === "janein") return '<div class="feld"><span class="lab">' + esc(feldName(f)) + auge + '</span><div class="segment" data-seg="w:' + f.id + '">' +
+          [["ja", T.ja, w === true], ["nein", T.nein, w === false], ["", "–", w == null || w === ""]].map(function (o) { return '<button type="button" data-v="' + o[0] + '" aria-pressed="' + o[2] + '">' + esc(o[1]) + "</button>"; }).join("") + "</div></div>";
         var typ = f.typ === "zahl" ? 'inputmode="decimal"' : f.typ === "datum" ? 'type="date"' : "";
-        return '<div class="feld">' + lab + '<input id="' + id + '" data-w="' + f.id + '" ' + typ + ' value="' + esc(w) + '"></div>';
+        var einheit = /\(€\)/.test(f.de) ? ' class="euro"' : "";
+        return '<div class="feld">' + lab + '<span' + einheit + '><input id="' + id + '" data-w="' + f.id + '" ' + typ + ' value="' + esc(w) + '" placeholder="' + (f.typ === "zahl" ? "0" : "") + '"></span></div>';
       }
+      function karte(titel, inhalt, offen) { return inhalt ? '<details class="karte block"' + (offen ? " open" : "") + '><summary><h3>' + esc(titel) + '</h3><span class="ch" aria-hidden="true">⌄</span></summary><div class="raster2">' + inhalt + "</div></details>" : ""; }
 
       app.innerHTML =
-        '<article class="editor">' +
-          '<section class="fotos" id="fotos"></section>' +
-          '<div class="fotoknoepfe"><button type="button" class="knopf" id="fotoKamera">📷 ' + esc(T.fotoAufnehmen) + '</button><button type="button" class="knopf leise" id="fotoGalerie">🖼 ' + esc(T.fotoWaehlen) + "</button></div>" +
-          '<div class="felder">' +
-            '<div class="feld breit"><label for="g-name">' + esc(T.name) + ' <small class="nr">' + esc(nrText(g)) + '</small></label><input id="g-name" data-g="name" value="' + esc(g.name) + '" autocomplete="off"></div>' +
-            '<div class="feld"><label for="g-kat">' + esc(T.kategorie) + '</label><input id="g-kat" data-g="kategorie" list="kats" value="' + esc(g.kategorie) + '"><datalist id="kats">' + kats.map(function (k) { return '<option value="' + esc(k) + '">'; }).join("") + "</datalist></div>" +
-            '<div class="feld"><label for="g-ort">' + esc(T.ort) + '</label><select id="g-ort" data-g="ort_id">' + ortOptionen(g.ort_id) + "</select></div>" +
-            '<div class="feld"><label for="g-menge">' + esc(T.menge) + '</label><input id="g-menge" data-g="menge" inputmode="decimal" value="' + esc(g.menge) + '"></div>' +
-            '<div class="feld"><label for="g-status">' + esc(T.status) + '</label><select id="g-status" data-g="status">' + S.start.status.map(function (st) { return '<option value="' + st + '"' + (g.status === st ? " selected" : "") + ">" + esc(T.st[st]) + "</option>"; }).join("") + "</select></div>" +
-            s.felder.filter(function (f) { return !f.aus; }).map(feldHtml).join("") +
-            '<div class="feld breit"><label for="g-notizen">' + esc(T.notizen) + '</label><textarea id="g-notizen" data-g="notizen" rows="3">' + esc(g.notizen) + "</textarea></div>" +
+        '<article class="editor2">' +
+          '<aside class="buehne"><div class="fotos2" id="fotos"></div>' +
+            '<div class="fotoknoepfe"><button type="button" class="knopf" id="fotoKamera">📷 ' + esc(T.fotoAufnehmen) + '</button><button type="button" class="knopf leise" id="fotoGalerie">🖼 ' + esc(T.fotoWaehlen) + "</button></div></aside>" +
+          '<div class="formular">' +
+            '<div class="kopfzeile"><small class="nr">' + esc(nrText(g)) + '</small><input id="g-name" class="titelfeld" data-g="name" value="' + esc(g.name) + '" placeholder="' + esc(T.namePlatz) + '" autocomplete="off" aria-label="' + esc(T.name) + '"></div>' +
+            '<section class="karte block"><div class="raster2">' +
+              '<div class="feld breit"><span class="lab">' + esc(T.kategorie) + '</span><div class="chips kat" id="katChips">' +
+                kats.map(function (k) { return '<button type="button" class="chip" data-k="' + esc(k) + '" aria-pressed="' + (g.kategorie === k) + '">' + esc(k) + "</button>"; }).join("") +
+                '<input id="g-kat" class="chipfeld" data-g="kategorie" value="' + esc(kats.indexOf(g.kategorie) < 0 ? g.kategorie : "") + '" placeholder="＋ ' + esc(T.eigene) + '"></div></div>' +
+              '<div class="feld breit"><label for="g-ort">' + esc(T.ort) + '</label><div class="ortwahl"><select id="g-ort">' + ortOptionen(g.ort_id) + '<option value="__neu">＋ ' + esc(T.ortNeu) + ' …</option></select>' +
+                '<span class="neuort" hidden><input id="g-ortneu" placeholder="' + esc(T.ortNeuPlatz) + '"><button type="button" class="knopf" id="g-ortok">' + esc(T.anlegen) + "</button></span></div>" +
+                '<small class="pfad" id="ortPfad">' + esc(ortPfad(g.ort_id)) + "</small></div>" +
+              '<div class="feld"><label for="g-menge">' + esc(T.menge) + '</label><div class="zahlfeld"><button type="button" data-d="-1" aria-label="−">−</button><input id="g-menge" data-g="menge" inputmode="decimal" value="' + esc(g.menge) + '"><button type="button" data-d="1" aria-label="+">+</button></div></div>' +
+              '<div class="feld"><span class="lab">' + esc(T.status) + '</span><div class="segment" data-seg="status">' + S.start.status.map(function (st) { return '<button type="button" data-v="' + st + '" aria-pressed="' + (g.status === st) + '">' + esc(T.st[st]) + "</button>"; }).join("") + "</div></div>" +
+            "</div></section>" +
+            karte(T.details, details.map(feldHtml).join(""), true) +
+            karte(T.wertBelege, geld.map(feldHtml).join(""), geld.some(function (f) { return g.werte[f.id] != null && g.werte[f.id] !== ""; })) +
+            '<section class="karte block"><div class="feld breit"><label for="g-notizen">' + esc(T.notizen) + '</label><textarea id="g-notizen" data-g="notizen" rows="3">' + esc(g.notizen) + "</textarea></div></section>" +
+            '<footer class="unten"><button type="button" class="knopf leise" id="qrDing">▣ ' + esc(T.qr) + '</button><button type="button" class="knopf gefahr" id="loeschen">' + esc(T.loeschen) + "</button></footer>" +
           "</div>" +
-          '<footer class="unten"><button type="button" class="knopf leise" id="qrDing">▣ ' + esc(T.qr) + '</button><button type="button" class="knopf gefahr" id="loeschen">' + esc(T.loeschen) + "</button></footer>" +
         "</article>";
 
       function fotosZeichnen() {
-        $("#fotos").innerHTML = g.fotos.map(function (f, i) {
-          return '<figure><img src="/f/' + s.id + "/" + g.id + "/" + f + '" alt="">' + '<figcaption>' + (i ? '<button type="button" data-titel="' + f + '">★ ' + esc(T.titelbild) + "</button>" : "<span>★</span>") +
-            '<button type="button" data-weg="' + f + '" aria-label="' + esc(T.fotoLoeschen) + '">✕</button></figcaption></figure>';
-        }).join("") || '<button type="button" class="leerfoto" id="leerfoto">📷</button>';
-        var lf = $("#leerfoto"); if (lf) lf.onclick = function () { $("#w-foto").click(); };
+        if (!g.fotos.length) {
+          $("#fotos").innerHTML = '<button type="button" class="leer2" id="leerfoto" aria-label="' + esc(T.fotoAufnehmen) + '">' + platzhalter(s.vorlage) + '<span class="ueber">📷 ' + esc(T.fotoHier) + "</span></button>";
+          $("#leerfoto").onclick = function () { fotoEingabe($("#w-fotoGalerie")); };
+          return;
+        }
+        $("#fotos").innerHTML = '<figure class="gross"><img src="/f/' + s.id + "/" + g.id + "/" + g.fotos[0] + '" alt=""><figcaption><span>★ ' + esc(T.titelbild) + '</span><button type="button" data-weg="' + g.fotos[0] + '" aria-label="' + esc(T.fotoLoeschen) + '">✕</button></figcaption></figure>' +
+          (g.fotos.length > 1 ? '<div class="daumen">' + g.fotos.slice(1).map(function (f) {
+            return '<figure><img loading="lazy" src="/f/' + s.id + "/" + g.id + "/" + f + '" alt=""><figcaption><button type="button" data-titel="' + f + '" title="' + esc(T.titelbild) + '">★</button><button type="button" data-weg="' + f + '" aria-label="' + esc(T.fotoLoeschen) + '">✕</button></figcaption></figure>';
+          }).join("") + "</div>" : "");
         [].forEach.call(app.querySelectorAll("[data-weg]"), function (b) {
           b.onclick = function () { api("/sammlungen/" + s.id + "/gegenstaende/" + g.id + "/fotos/" + b.dataset.weg, { method: "DELETE" }).then(function (r) { g.fotos = r.fotos; fotosZeichnen(); toast(T.gespeichert); }); };
         });
@@ -295,8 +328,8 @@
             api("/sammlungen/" + s.id + "/gegenstaende/" + g.id + "/fotos", { method: "PUT", body: { fotos: neu } }).then(function (r) { g.fotos = r.fotos; fotosZeichnen(); toast(T.gespeichert); }); };
         });
       }
-      fotosZeichnen();
       function fotoEingabe(inp) { inp.value = ""; inp.onchange = function () { fotosHochladen(inp.files, s, g).then(fotosZeichnen); }; inp.click(); }
+      fotosZeichnen();
       $("#fotoKamera").onclick = function () { fotoEingabe($("#w-foto")); };
       $("#fotoGalerie").onclick = function () { fotoEingabe($("#w-fotoGalerie")); };
 
@@ -315,10 +348,49 @@
         }).catch(function () { toast(T.fehler, true); });
       }
       window.addEventListener("hashchange", senden, { once: true });
-      [].forEach.call(app.querySelectorAll("[data-g],[data-w]"), function (el) {
-        var feld = el.dataset.g || "w:" + el.dataset.w, sofort = el.tagName === "SELECT";
-        el.addEventListener(sofort ? "change" : "input", function () { merken(feld, el.value, sofort); });
+      [].forEach.call(app.querySelectorAll("input[data-g],textarea[data-g],input[data-w],textarea[data-w]"), function (el) {
+        el.addEventListener("input", function () { merken(el.dataset.g || "w:" + el.dataset.w, el.value); });
       });
+      // Segmente (Status, Ja/Nein): Antippen speichert sofort
+      [].forEach.call(app.querySelectorAll(".segment"), function (seg) {
+        seg.addEventListener("click", function (e) {
+          var b = e.target.closest("button"); if (!b) return;
+          [].forEach.call(seg.children, function (x) { x.setAttribute("aria-pressed", String(x === b)); });
+          merken(seg.dataset.seg, b.dataset.v, true);
+        });
+      });
+      // Kategorie: Chip antippen oder eigene tippen
+      var katFeld = $("#g-kat");
+      $("#katChips").addEventListener("click", function (e) {
+        var b = e.target.closest("button[data-k]"); if (!b) return;
+        var an = b.getAttribute("aria-pressed") !== "true";
+        [].forEach.call(this.querySelectorAll("button[data-k]"), function (x) { x.setAttribute("aria-pressed", String(an && x === b)); });
+        katFeld.value = ""; merken("kategorie", an ? b.dataset.k : "", true);
+      });
+      katFeld.addEventListener("input", function () { [].forEach.call($("#katChips").querySelectorAll("button[data-k]"), function (x) { x.setAttribute("aria-pressed", "false"); }); });
+      // Menge −/+
+      [].forEach.call(app.querySelectorAll(".zahlfeld button"), function (b) {
+        b.onclick = function () { var m = $("#g-menge"), n = Math.max(0, (parseFloat(String(m.value).replace(",", ".")) || 0) + +b.dataset.d); m.value = n; merken("menge", n, true); };
+      });
+      // Ort: wählen oder direkt hier neu anlegen
+      var ortSel = $("#g-ort"), neuBox = app.querySelector(".neuort"), neuIn = $("#g-ortneu");
+      ortSel.onchange = function () {
+        if (ortSel.value === "__neu") { neuBox.hidden = false; neuIn.focus(); return; }
+        neuBox.hidden = true; $("#ortPfad").textContent = ortPfad(ortSel.value || null); merken("ort_id", ortSel.value || null, true);
+      };
+      function ortAnlegen() {
+        var name = neuIn.value.trim(); if (!name) return;
+        var eltern = g.ort_id || null; // neuer Ort liegt im bisher gewählten (z. B. Haus → Wohnzimmer)
+        api("/sammlungen/" + s.id + "/orte", { method: "POST", body: { name: name, eltern_id: eltern } }).then(function (o) {
+          S.akt.orte.push(o); g.ort_id = o.id;
+          ortSel.innerHTML = ortOptionen(o.id) + '<option value="__neu">＋ ' + esc(T.ortNeu) + " …</option>";
+          neuBox.hidden = true; neuIn.value = ""; $("#ortPfad").textContent = ortPfad(o.id);
+          merken("ort_id", o.id, true);
+        }).catch(function () {});
+      }
+      $("#g-ortok").onclick = ortAnlegen;
+      neuIn.addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); ortAnlegen(); } if (e.key === "Escape") { neuBox.hidden = true; ortSel.value = g.ort_id || ""; } });
+
       $("#loeschen").onclick = function () {
         if (!confirm(T.gegenstandLoeschen)) return;
         api("/sammlungen/" + s.id + "/gegenstaende/" + g.id, { method: "DELETE" }).then(function () {
