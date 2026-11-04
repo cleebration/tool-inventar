@@ -133,6 +133,58 @@ await pruef("Import mit Orts-Pfad, neuem Feld und Export als CSV", async () => {
   assert.doesNotMatch(h, />Uhr</, "verkauft ist öffentlich unsichtbar"); assert.doesNotMatch(h, /Uniqa/);
 });
 
+await pruef("Tags: mehrere je Gegenstand, alt „kategorie“ wird Tag, Tag löschen entfernt überall", async () => {
+  let j = await (await nate.go("/api/sammlungen/" + s.id)).json();
+  const ikone = j.gegenstaende.find(x => x.name === "Ikone Hodegetria");
+  assert.deepEqual(ikone.tags, ["Ikone"]);
+  const neu = await (await nate.go(`/api/sammlungen/${s.id}/gegenstaende/${ikone.id}`, { method: "PATCH", json: { tags: ["Ikone", " byzantinisch ", "ikone", "", "Geschenk"] } })).json();
+  assert.deepEqual(neu.tags, ["Ikone", "byzantinisch", "Geschenk"]); assert.equal(neu.kategorie, "Ikone");
+  const bild = j.gegenstaende.find(x => x.name === "Bild Linz");
+  await nate.go(`/api/sammlungen/${s.id}/gegenstaende/${bild.id}`, { method: "PATCH", json: { tags: ["Bild", "Geschenk"] } });
+  j = await (await nate.go("/api/sammlungen/" + s.id)).json();
+  assert.ok(j.sammlung.tags.includes("Geschenk") && j.sammlung.tags.includes("Ikone"), "Vorschläge enthalten benutzte Tags");
+  const s2 = await (await nate.go("/api/sammlungen/" + s.id, { method: "PATCH", json: { tagWeg: "Geschenk" } })).json();
+  assert.ok(!s2.tags.includes("Geschenk"));
+  j = await (await nate.go("/api/sammlungen/" + s.id)).json();
+  assert.ok(j.gegenstaende.every(x => !x.tags.includes("Geschenk")), "Tag bei allen entfernt");
+  assert.match(await (await nate.go(`/api/sammlungen/${s.id}/export.csv`)).text(), /Ikone, byzantinisch/);
+  const h = await (await gast.go("/o/" + s.slug)).text();
+  assert.match(h, /data-k="\[&quot;Ikone&quot;,&quot;byzantinisch&quot;\]"/);
+});
+
+await pruef("Reihenfolge: Gegenstände und Sammlungen per Ziehen", async () => {
+  let j = await (await nate.go("/api/sammlungen/" + s.id)).json();
+  const ids = j.gegenstaende.map(x => x.id).reverse();
+  assert.equal((await nate.go(`/api/sammlungen/${s.id}/reihenfolge`, { method: "PUT", json: { ids: [...ids, "fremd"] } })).status, 200);
+  j = await (await nate.go("/api/sammlungen/" + s.id)).json();
+  assert.deepEqual(j.gegenstaende.map(x => x.id), ids);
+  const neu = await (await nate.go(`/api/sammlungen/${s.id}/gegenstaende`, { method: "POST", json: { name: "Letzter" } })).json();
+  j = await (await nate.go("/api/sammlungen/" + s.id)).json();
+  assert.equal(j.gegenstaende.at(-1).id, neu.id, "Neues kommt ans Ende");
+  await nate.go(`/api/sammlungen/${s.id}/gegenstaende/${neu.id}`, { method: "DELETE" });
+  const zweite = await (await nate.go("/api/sammlungen", { method: "POST", json: { vorlage: "frei", name: "Zweite" } })).json();
+  let st = await (await nate.go("/api/start")).json();
+  assert.deepEqual(st.sammlungen.map(x => x.id), [s.id, zweite.id]);
+  await nate.go("/api/sammlungen/reihenfolge", { method: "PUT", json: { ids: [zweite.id, s.id] } });
+  st = await (await nate.go("/api/start")).json();
+  assert.deepEqual(st.sammlungen.map(x => x.id), [zweite.id, s.id]);
+  assert.equal((await chris.go("/api/sammlungen/reihenfolge", { method: "PUT", json: { ids: [s.id] } })).status, 200);
+  st = await (await nate.go("/api/start")).json();
+  assert.deepEqual(st.sammlungen.map(x => x.id), [zweite.id, s.id], "fremdes Konto ändert nichts");
+  await nate.go("/api/sammlungen/" + zweite.id, { method: "DELETE" });
+});
+
+await pruef("Sprache umschalten setzt Cookie und führt zurück", async () => {
+  const r = await gast.go("/sprache?l=en&zurueck=" + encodeURIComponent("/o/" + s.slug));
+  assert.equal(r.status, 302); assert.match(r.headers.get("location"), new RegExp("/o/" + s.slug + "$"));
+  assert.match(r.headers.get("set-cookie"), /cleeb_lang=en/);
+  const h = await (await gast.go("/o/" + s.slug)).text();
+  assert.match(h, /lang="en"/); assert.match(h, /sprache="\/sprache\?l=de/);
+  const boese = await gast.go("/sprache?l=de&zurueck=" + encodeURIComponent("//boese.example"));
+  assert.doesNotMatch(boese.headers.get("location"), /boese/);
+  await gast.go("/sprache?l=de&zurueck=/");
+});
+
 await pruef("Grenzen aus dem Store: 4. Sammlung und Fotos über Basis", async () => {
   await fetch(STORE + "/test/werte", { method: "POST", body: JSON.stringify({ fotos_frei: 1 }) });
   await new Promise(r => setTimeout(r, 50));

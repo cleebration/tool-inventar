@@ -27,6 +27,9 @@
       grenze: { sammlungen: "Mehr Sammlungen gibt es mit Inventar Plus.", gegenstaende: "Mehr Gegenstände gibt es mit Inventar Plus.", fotos: "Mehr Fotos je Gegenstand gibt es mit Inventar Plus." },
       zumStore: "Im Store ansehen", qr: "QR-Code", qrOrt: "QR für diesen Ort – aufkleben, scannen, Inhalt sehen", qrDing: "QR für diesen Gegenstand",
       inOrt: "Inhalt von", ansicht: "Kacheln / Liste", namePlatz: "Wie heißt der Gegenstand?", eigene: "eigene", ortNeuPlatz: "z. B. Wohnzimmer", anlegen: "Anlegen", details: "Details", wertBelege: "Wert, Kauf & Versicherung", fotoHier: "Foto hinzufügen", wert: "Gesamt-Schätzwert", laedt: "Lädt …", foto: "Foto", fotoLaedt: "Foto wird hochgeladen …",
+      tags: "Tags", tagNeu: "＋ Tag", tagsVerwalten: "Tags der Sammlung", tagWegFrage: "Tag „%s“ löschen? Er verschwindet auch bei allen Gegenständen.", ziehen: "Ziehen zum Verschieben",
+      sammlungWegFrage: "Sammlung „%s“ löschen?", sammlungWegMit: "Sie enthält %n Gegenstände mit allen Fotos. Zum Bestätigen den Namen eintippen:", endgueltig: "Endgültig löschen", abbrechen: "Abbrechen",
+      dingWegFrage: "„%s“ löschen? Fotos werden mitgelöscht.", vor: "Nächstes Foto", zurueckFoto: "Voriges Foto", vergroessern: "Groß ansehen",
     },
     en: {
       sammlungen: "Your collections", neueSammlung: "New collection", gegenstaende: "items", vorlageWaehlen: "What is the collection for?",
@@ -47,6 +50,9 @@
       grenze: { sammlungen: "More collections with Inventory Plus.", gegenstaende: "More items with Inventory Plus.", fotos: "More photos per item with Inventory Plus." },
       zumStore: "See in store", qr: "QR code", qrOrt: "QR for this place – stick it on, scan, see contents", qrDing: "QR for this item",
       inOrt: "Contents of", ansicht: "Grid / list", namePlatz: "What is it called?", eigene: "custom", ortNeuPlatz: "e.g. Living room", anlegen: "Add", details: "Details", wertBelege: "Value, purchase & insurance", fotoHier: "Add photo", wert: "Total estimate", laedt: "Loading …", foto: "Photo", fotoLaedt: "Uploading photo …",
+      tags: "Tags", tagNeu: "＋ Tag", tagsVerwalten: "Collection tags", tagWegFrage: "Delete tag “%s”? It is removed from all items too.", ziehen: "Drag to move",
+      sammlungWegFrage: "Delete collection “%s”?", sammlungWegMit: "It contains %n items with all photos. Type the name to confirm:", endgueltig: "Delete for good", abbrechen: "Cancel",
+      dingWegFrage: "Delete “%s”? Its photos are deleted too.", vor: "Next photo", zurueckFoto: "Previous photo", vergroessern: "View large",
     },
   }[L];
 
@@ -58,7 +64,7 @@
   var esc = function (s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); };
   var app = $("#app"), leiste = $("cleebration-leiste");
   var W = { suche: $("#w-suche"), neu: $("#w-neu"), orte: $("#w-orte"), teilen: $("#w-teilen"), sammlung: $("#w-sammlung") };
-  var S = { start: null, akt: null, ansicht: "kacheln", filter: { k: "", o: "", s: "" } };
+  var S = { start: null, akt: null, ansicht: "kacheln", filter: { t: [], o: "", s: "" } };
   try { S.ansicht = localStorage.getItem("inv-ansicht") || "kacheln"; } catch (e) {}
   // Titel der Werkzeuge in der Sprache der Seite
   W.suche.title = W.suche.placeholder = L === "en" ? "Search" : "Suchen"; W.neu.title = T.neu; W.orte.title = T.orte; W.teilen.title = T.teilen; W.sammlung.title = T.einstellungen;
@@ -89,11 +95,65 @@
   }
 
   /* ---------- Leiste ---------- */
+  // zurueck: Adresse für den Zurück-Knopf. Die Leiste nimmt nur Adressen mit „/“ oder „https://“ → „/#/s/…“.
+  // Ohne zurueck (Übersicht) führt das X zu den Tools im Store.
   function werkzeuge(liste, zurueck) {
     Object.keys(W).forEach(function (k) { W[k].hidden = liste.indexOf(k) < 0; });
     if (zurueck) { leiste.setAttribute("schliessen", zurueck); leiste.setAttribute("schliessen-art", "zurueck"); }
-    else { leiste.removeAttribute("schliessen"); leiste.removeAttribute("schliessen-art"); }
+    else { leiste.setAttribute("schliessen", "https://store.cleebration.com/"); leiste.removeAttribute("schliessen-art"); }
+    leiste.setAttribute("sprache", "/sprache?l=" + (L === "en" ? "de" : "en") + "&zurueck=" + encodeURIComponent("/" + (location.hash || "#/")));
     leiste.setAttribute("lang", L); // neu zeichnen (Kinder ein-/ausgeblendet)
+  }
+  function fmt(t, w, n) { return String(t).replace("%s", w == null ? "" : w).replace("%n", n == null ? "" : n); }
+  // Rückfrage im App-Stil (statt confirm/prompt); mitName = Name muss eingetippt werden
+  function fragen(titel, text, knopf, mitName) {
+    return new Promise(function (ok) {
+      var fertig = false;
+      var d = dialog(titel, '<p>' + esc(text) + "</p>" + (mitName ? '<input id="q-name" autocomplete="off" placeholder="' + esc(mitName) + '">' : "") +
+        '<div class="reihe knoepfe rechts"><button type="button" class="knopf leise" id="q-nein">' + esc(T.abbrechen) + '</button><button type="button" class="knopf gefahr" id="q-ja"' + (mitName ? " disabled" : "") + ">" + esc(knopf || T.loeschen) + "</button></div>",
+        function () { if (!fertig) ok(false); });
+      var ja = d.querySelector("#q-ja"), n = d.querySelector("#q-name");
+      if (n) { n.oninput = function () { ja.disabled = n.value.trim() !== mitName.trim(); }; n.focus(); }
+      d.querySelector("#q-nein").onclick = function () { d.close(); };
+      ja.onclick = function () { fertig = true; d.close(); ok(true); };
+    });
+  }
+
+  /* ---------- Kacheln ziehen (Sammlungen, Gegenstände) ----------
+     Maus/Stift: Kachel festhalten und ziehen (ab 8 px). Finger: am Griff ⋮⋮ ziehen, sonst wird normal gescrollt.
+     Nach dem Ziehen wird der Klick geschluckt, damit sich die Kachel nicht öffnet. */
+  function kachelnZiehbar(box, auswahl, fertig) {
+    var z = null;
+    box.addEventListener("pointerdown", function (e) {
+      if (e.button) return;
+      var k = e.target.closest(auswahl); if (!k || !box.contains(k)) return;
+      if (e.target.closest("button:not(.griff),input,select")) return;
+      var griff = e.target.closest(".griff");
+      if (e.pointerType === "touch" && !griff) return;
+      z = { k: k, x: e.clientX, y: e.clientY, an: false, id: e.pointerId };
+      if (griff) { e.preventDefault(); losgehen(); }
+    });
+    function losgehen() { z.an = true; z.k.classList.add("zieht"); box.classList.add("beimZiehen"); try { box.setPointerCapture(z.id); } catch (x) {} }
+    box.addEventListener("pointermove", function (e) {
+      if (!z) return;
+      if (!z.an) { if (Math.abs(e.clientX - z.x) + Math.abs(e.clientY - z.y) < 8) return; losgehen(); }
+      e.preventDefault();
+      var el = document.elementFromPoint(e.clientX, e.clientY), ueber = el && el.closest(auswahl);
+      if (!ueber || ueber === z.k || ueber.parentNode !== z.k.parentNode) return;
+      var r = ueber.getBoundingClientRect(), zeile = Math.abs(r.top - z.k.getBoundingClientRect().top) < r.height / 2;
+      var davor = zeile ? e.clientX < r.left + r.width / 2 : e.clientY < r.top + r.height / 2;
+      z.k.parentNode.insertBefore(z.k, davor ? ueber : ueber.nextSibling);
+    });
+    function ende() {
+      if (!z) return; var war = z.an, k = z.k; z = null;
+      if (!war) return;
+      k.classList.remove("zieht"); box.classList.remove("beimZiehen");
+      var schlucken = function (e) { e.preventDefault(); e.stopPropagation(); };
+      box.addEventListener("click", schlucken, { capture: true, once: true }); setTimeout(function () { box.removeEventListener("click", schlucken, true); }, 60);
+      fertig([].map.call(box.querySelectorAll(auswahl), function (x) { return x.dataset.id; }));
+    }
+    box.addEventListener("pointerup", ende); box.addEventListener("pointercancel", ende);
+    box.addEventListener("dragstart", function (e) { e.preventDefault(); });
   }
 
   /* ---------- Dialog ---------- */
@@ -168,11 +228,31 @@
       app.innerHTML = '<h1 class="titel">' + esc(T.sammlungen) + '</h1><section class="raster sammlungen">' +
         j.sammlungen.map(function (s) {
           var v = j.vorlagen[s.vorlage] || j.vorlagen.frei;
-          return '<a class="karte sammlung" href="#/s/' + esc(s.id) + '"><span class="gross">' + v.icon + "</span><h2>" + esc(s.name) + "</h2><p>" + (s.anzahl || 0) + " " + esc(T.gegenstaende) +
+          return '<a class="karte sammlung" draggable="false" data-id="' + esc(s.id) + '" href="#/s/' + esc(s.id) + '"><span class="griff" title="' + esc(T.ziehen) + '" aria-hidden="true">⋮⋮</span>' +
+            '<button type="button" class="weg" data-weg="' + esc(s.id) + '" title="' + esc(T.sammlungLoeschen) + '" aria-label="' + esc(T.sammlungLoeschen) + '">✕</button>' +
+            '<span class="gross">' + v.icon + "</span><h2>" + esc(s.name) + "</h2><p>" + (s.anzahl || 0) + " " + esc(T.gegenstaende) +
             (s.sicht !== "privat" ? " · " + esc(s.sicht === "link" ? T.link : T.oeffentlich) : "") + "</p></a>";
         }).join("") +
         '<button type="button" class="karte sammlung neu" id="neueSammlung"><span class="gross">＋</span><h2>' + esc(T.neueSammlung) + "</h2></button></section>";
       $("#neueSammlung").onclick = neueSammlung;
+      var box = $(".sammlungen");
+      box.addEventListener("click", function (e) {
+        var b = e.target.closest("[data-weg]"); if (!b) return;
+        e.preventDefault(); e.stopPropagation();
+        var s = j.sammlungen.find(function (x) { return x.id === b.dataset.weg; });
+        sammlungLoeschen(s).then(function (weg) { if (weg) start(false); });
+      });
+      kachelnZiehbar(box, "a.sammlung", function (ids) {
+        api("/sammlungen/reihenfolge", { method: "PUT", body: { ids: ids } }).then(function () { toast(T.gespeichert); }, function () { toast(T.fehler, true); });
+      });
+    });
+  }
+
+  function sammlungLoeschen(s) {
+    var n = s.anzahl != null ? s.anzahl : (S.akt && S.akt.sammlung.id === s.id ? S.akt.gegenstaende.length : 0);
+    return fragen(fmt(T.sammlungWegFrage, s.name), n ? fmt(T.sammlungWegMit, null, n) : "", T.endgueltig, n ? s.name : null).then(function (ja) {
+      if (!ja) return false;
+      return api("/sammlungen/" + s.id, { method: "DELETE" }).then(function () { if (S.akt && S.akt.sammlung.id === s.id) S.akt = null; toast(T.gespeichert); return true; });
     });
   }
 
@@ -190,13 +270,13 @@
 
   function sammlungLaden(id) {
     if (S.akt && S.akt.sammlung.id === id) return Promise.resolve(S.akt);
-    return api("/sammlungen/" + id).then(function (j) { S.akt = j; S.filter = { k: "", o: "", s: "" }; W.suche.value = ""; return j; });
+    return api("/sammlungen/" + id).then(function (j) { S.akt = j; S.filter = { t: [], o: "", s: "" }; W.suche.value = ""; return j; });
   }
 
   function sammlung(id, ortFilter) {
     return sammlungLaden(id).then(function (j) {
       if (ortFilter != null) S.filter.o = ortFilter;
-      werkzeuge(["suche", "neu", "orte", "teilen", "sammlung"], "#/");
+      werkzeuge(["suche", "neu", "orte", "teilen", "sammlung"], "/#/");
       document.title = j.sammlung.name + " · Inventar";
       zeichneSammlung();
     });
@@ -210,17 +290,21 @@
     var orte = S.filter.o ? ortNachkommen(S.filter.o) : null;
     var felder = s.felder.filter(function (f) { return !f.aus; });
     var liste = j.gegenstaende.filter(function (g) {
-      if (S.filter.k && g.kategorie !== S.filter.k) return false;
+      if (S.filter.t.length && S.filter.t.some(function (t) { return (g.tags || []).indexOf(t) < 0; })) return false;
       if (orte && orte.indexOf(g.ort_id) < 0) return false;
       if (S.filter.s && g.status !== S.filter.s) return false;
       if (!q) return true;
-      var t = [nrText(g), g.name, g.kategorie, ortPfad(g.ort_id), g.notizen].concat(felder.map(function (f) { return g.werte[f.id]; })).join(" ").toLowerCase();
+      var t = [nrText(g), g.name, (g.tags || []).join(" "), ortPfad(g.ort_id), g.notizen].concat(felder.map(function (f) { return g.werte[f.id]; })).join(" ").toLowerCase();
       return t.indexOf(q) >= 0;
     });
-    var kats = [], sts = [];
-    j.gegenstaende.forEach(function (g) { if (g.kategorie && kats.indexOf(g.kategorie) < 0) kats.push(g.kategorie); if (sts.indexOf(g.status) < 0) sts.push(g.status); });
-    kats.sort(function (a, b) { return a.localeCompare(b); });
+    var tags = [], zahl = {}, sts = [];
+    j.gegenstaende.forEach(function (g) { (g.tags || []).forEach(function (t) { zahl[t] = (zahl[t] || 0) + 1; }); if (sts.indexOf(g.status) < 0) sts.push(g.status); });
+    // Reihenfolge der Sammlung (Vorlage/eigene), dann übrige
+    (s.tags || []).concat(Object.keys(zahl).sort(function (a, b) { return a.localeCompare(b); })).forEach(function (t) { if (zahl[t] && tags.indexOf(t) < 0) tags.push(t); });
+    S.filter.t = S.filter.t.filter(function (t) { return zahl[t]; });
     var chip = function (art, wert, text) { return '<button type="button" class="chip" data-f="' + art + '" data-w="' + esc(wert) + '" aria-pressed="' + (S.filter[art] === wert) + '">' + esc(text) + "</button>"; };
+    var tagChip = function (t) { return '<button type="button" class="chip tag" data-tag="' + esc(t) + '" aria-pressed="' + (S.filter.t.indexOf(t) >= 0) + '">#' + esc(t) + ' <small>' + zahl[t] + "</small></button>"; };
+    var sortierbar = !q && !S.filter.t.length && !S.filter.o && !S.filter.s;
     var wertSumme = 0, hatWert = false;
     liste.forEach(function (g) { var v = g.werte.wert_bis != null ? g.werte.wert_bis : g.werte.wert_von; if (typeof v === "number") { wertSumme += v * (g.menge || 1); hatWert = true; } });
 
@@ -229,20 +313,45 @@
       (hatWert ? " · " + esc(T.wert) + " " + wertSumme.toLocaleString(L === "en" ? "en-GB" : "de-AT", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }) : "") + "</p>" +
       '<nav class="chips">' +
         (S.filter.o ? '<button type="button" class="chip an" data-f="o" data-w="">📍 ' + esc(ortPfad(S.filter.o)) + " ✕</button>" : "") +
-        (kats.length > 1 ? chip("k", "", T.alle) + kats.map(function (k) { return chip("k", k, k); }).join("") : "") +
+        (tags.length ? '<button type="button" class="chip" data-tag="" aria-pressed="' + !S.filter.t.length + '">' + esc(T.alle) + "</button>" + tags.map(tagChip).join("") : "") +
         (sts.length > 1 ? sts.map(function (st) { return chip("s", st === S.filter.s ? "" : st, T.st[st]); }).join("") : "") +
         '<button type="button" class="chip ansicht" id="ansicht" title="' + esc(T.ansicht) + '" aria-label="' + esc(T.ansicht) + '">' + (S.ansicht === "liste" ? ICON.kacheln : ICON.liste) + "</button>" +
       "</nav></header>" +
-      (liste.length ? '<section class="' + (S.ansicht === "liste" ? "liste" : "raster") + '">' + liste.map(function (g) {
-        var bild = g.fotos[0] ? '<img loading="lazy" src="/f/' + s.id + "/" + g.id + "/" + g.fotos[0] + '" alt="">' : platzhalter(s.vorlage, true);
-        return '<a class="karte ding' + (g.status === "verkauft" || g.status === "weg" ? " blass" : "") + '" href="#/s/' + s.id + "/g/" + g.id + '"><span class="bild">' + bild + '</span><span class="text"><small>' + esc(nrText(g)) +
-          (g.status !== "vorhanden" ? " · " + esc(T.st[g.status]) : "") + "</small><b>" + esc(g.name || "—") + "</b><small>" + esc([g.kategorie, ortPfad(g.ort_id)].filter(Boolean).join(" · ")) + "</small></span></a>";
+      (liste.length ? '<section class="dinge ' + (S.ansicht === "liste" ? "liste" : "raster") + (sortierbar ? " sortierbar" : "") + '">' + liste.map(function (g) {
+        var bild = g.fotos[0] ? '<img loading="lazy" draggable="false" src="/f/' + s.id + "/" + g.id + "/" + g.fotos[0] + '" alt="">' : platzhalter(s.vorlage, true);
+        return '<a class="karte ding' + (g.status === "verkauft" || g.status === "weg" ? " blass" : "") + '" draggable="false" data-id="' + esc(g.id) + '" href="#/s/' + s.id + "/g/" + g.id + '">' +
+          (sortierbar ? '<span class="griff" title="' + esc(T.ziehen) + '" aria-hidden="true">⋮⋮</span>' : "") +
+          '<button type="button" class="weg" data-weg="' + esc(g.id) + '" title="' + esc(T.loeschen) + '" aria-label="' + esc(T.loeschen) + '">✕</button>' +
+          '<span class="bild">' + bild + (g.fotos.length > 1 ? '<span class="anz">' + g.fotos.length + "</span>" : "") + '</span><span class="text"><small>' + esc(nrText(g)) +
+          (g.status !== "vorhanden" ? " · " + esc(T.st[g.status]) : "") + "</small><b>" + esc(g.name || "—") + "</b><small>" + esc(ortPfad(g.ort_id)) + "</small>" +
+          ((g.tags || []).length ? '<span class="tags">' + g.tags.map(function (t) { return "<i>#" + esc(t) + "</i>"; }).join("") + "</span>" : "") + "</span></a>";
       }).join("") + "</section>"
       : '<p class="leer">' + esc(j.gegenstaende.length ? T.nichtsGefunden : T.leer) + "</p>");
 
     $("#ansicht").onclick = function () { S.ansicht = S.ansicht === "liste" ? "kacheln" : "liste"; try { localStorage.setItem("inv-ansicht", S.ansicht); } catch (e) {} zeichneSammlung(); };
     [].forEach.call(app.querySelectorAll(".chip[data-f]"), function (b) {
       b.onclick = function () { S.filter[b.dataset.f] = b.dataset.f === "s" ? b.dataset.w : (S.filter[b.dataset.f] === b.dataset.w ? "" : b.dataset.w); if (b.dataset.f === "o" && !b.dataset.w) history.replaceState(null, "", "#/s/" + s.id); zeichneSammlung(); };
+    });
+    // Tags: mehrere wählbar (alle müssen passen), „Alle“ setzt zurück
+    [].forEach.call(app.querySelectorAll(".chip[data-tag]"), function (b) {
+      b.onclick = function () { var t = b.dataset.tag, i = S.filter.t.indexOf(t); if (!t) S.filter.t = []; else if (i < 0) S.filter.t.push(t); else S.filter.t.splice(i, 1); zeichneSammlung(); };
+    });
+    var box = app.querySelector("section.dinge");
+    if (!box) return;
+    box.addEventListener("click", function (e) {
+      var b = e.target.closest("[data-weg]"); if (!b) return;
+      e.preventDefault(); e.stopPropagation();
+      var g = j.gegenstaende.find(function (x) { return x.id === b.dataset.weg; });
+      fragen(T.gegenstandLoeschen, fmt(T.dingWegFrage, g.name || nrText(g)), T.loeschen).then(function (ja) {
+        if (!ja) return;
+        api("/sammlungen/" + s.id + "/gegenstaende/" + g.id, { method: "DELETE" }).then(function () {
+          j.gegenstaende = j.gegenstaende.filter(function (x) { return x.id !== g.id; }); toast(T.gespeichert); zeichneSammlung();
+        }, function () { toast(T.fehler, true); });
+      });
+    });
+    if (sortierbar) kachelnZiehbar(box, "a.ding", function (ids) {
+      j.gegenstaende.sort(function (a, b) { return ids.indexOf(a.id) - ids.indexOf(b.id); });
+      api("/sammlungen/" + s.id + "/reihenfolge", { method: "PUT", body: { ids: ids } }).then(function () { toast(T.gespeichert); }, function () { toast(T.fehler, true); });
     });
   }
 
@@ -267,10 +376,9 @@
     return sammlungLaden(sid).then(function (j) {
       var g = j.gegenstaende.find(function (x) { return x.id === gid; });
       if (!g) { location.replace("#/s/" + sid); return; }
-      werkzeuge([], "#/s/" + sid);
-      var s = j.sammlung, v = (S.start && S.start.vorlagen[s.vorlage]) || { kategorien: [] };
-      var kats = (v.kategorien || []).slice();
-      j.gegenstaende.forEach(function (x) { if (x.kategorie && kats.indexOf(x.kategorie) < 0) kats.push(x.kategorie); });
+      werkzeuge([], "/#/s/" + sid);
+      var s = j.sammlung;
+      g.tags = g.tags || [];
       document.title = (g.name || nrText(g)) + " · Inventar";
       var felder = s.felder.filter(function (f) { return !f.aus; });
       var details = felder.filter(function (f) { return GELD.indexOf(f.id) < 0; }), geld = felder.filter(function (f) { return GELD.indexOf(f.id) >= 0; });
@@ -294,9 +402,7 @@
           '<div class="formular">' +
             '<div class="kopfzeile"><small class="nr">' + esc(nrText(g)) + '</small><input id="g-name" class="titelfeld" data-g="name" value="' + esc(g.name) + '" placeholder="' + esc(T.namePlatz) + '" autocomplete="off" aria-label="' + esc(T.name) + '"></div>' +
             '<section class="karte block"><div class="raster2">' +
-              '<div class="feld breit"><span class="lab">' + esc(T.kategorie) + '</span><div class="chips kat" id="katChips">' +
-                kats.map(function (k) { return '<button type="button" class="chip" data-k="' + esc(k) + '" aria-pressed="' + (g.kategorie === k) + '">' + esc(k) + "</button>"; }).join("") +
-                '<input id="g-kat" class="chipfeld" data-g="kategorie" value="' + esc(kats.indexOf(g.kategorie) < 0 ? g.kategorie : "") + '" placeholder="＋ ' + esc(T.eigene) + '"></div></div>' +
+              '<div class="feld breit"><span class="lab">' + esc(T.tags) + '</span><div class="chips kat" id="tagChips"></div></div>' +
               '<div class="feld breit"><label for="g-ort">' + esc(T.ort) + '</label><div class="ortwahl"><select id="g-ort">' + ortOptionen(g.ort_id) + '<option value="__neu">＋ ' + esc(T.ortNeu) + ' …</option></select>' +
                 '<span class="neuort" hidden><input id="g-ortneu" placeholder="' + esc(T.ortNeuPlatz) + '"><button type="button" class="knopf" id="g-ortok">' + esc(T.anlegen) + "</button></span></div>" +
                 '<small class="pfad" id="ortPfad">' + esc(ortPfad(g.ort_id)) + "</small></div>" +
@@ -310,25 +416,47 @@
           "</div>" +
         "</article>";
 
+      var akt = 0;
       function fotosZeichnen() {
         if (!g.fotos.length) {
           $("#fotos").innerHTML = '<button type="button" class="leer2" id="leerfoto" aria-label="' + esc(T.fotoAufnehmen) + '">' + platzhalter(s.vorlage) + '<span class="ueber">📷 ' + esc(T.fotoHier) + "</span></button>";
           $("#leerfoto").onclick = function () { fotoEingabe($("#w-fotoGalerie")); };
           return;
         }
-        $("#fotos").innerHTML = '<figure class="gross"><img src="/f/' + s.id + "/" + g.id + "/" + g.fotos[0] + '" alt=""><figcaption><span>★ ' + esc(T.titelbild) + '</span><button type="button" data-weg="' + g.fotos[0] + '" aria-label="' + esc(T.fotoLoeschen) + '">✕</button></figcaption></figure>' +
-          (g.fotos.length > 1 ? '<div class="daumen">' + g.fotos.slice(1).map(function (f) {
-            return '<figure><img loading="lazy" src="/f/' + s.id + "/" + g.id + "/" + f + '" alt=""><figcaption><button type="button" data-titel="' + f + '" title="' + esc(T.titelbild) + '">★</button><button type="button" data-weg="' + f + '" aria-label="' + esc(T.fotoLoeschen) + '">✕</button></figcaption></figure>';
-          }).join("") + "</div>" : "");
-        [].forEach.call(app.querySelectorAll("[data-weg]"), function (b) {
-          b.onclick = function () { api("/sammlungen/" + s.id + "/gegenstaende/" + g.id + "/fotos/" + b.dataset.weg, { method: "DELETE" }).then(function (r) { g.fotos = r.fotos; fotosZeichnen(); toast(T.gespeichert); }); };
-        });
-        [].forEach.call(app.querySelectorAll("[data-titel]"), function (b) {
-          b.onclick = function () { var neu = [b.dataset.titel].concat(g.fotos.filter(function (x) { return x !== b.dataset.titel; }));
-            api("/sammlungen/" + s.id + "/gegenstaende/" + g.id + "/fotos", { method: "PUT", body: { fotos: neu } }).then(function (r) { g.fotos = r.fotos; fotosZeichnen(); toast(T.gespeichert); }); };
-        });
+        // Galerie: wischen, Pfeile, Tasten; unten Daumen zum Springen; ★ = Titelbild, ✕ = entfernen; Antippen = groß
+        var url = function (f) { return "/f/" + s.id + "/" + g.id + "/" + f; };
+        var n = g.fotos.length;
+        akt = Math.min(akt, n - 1);
+        $("#fotos").innerHTML = '<div class="galerie2"><div class="bahn" id="bahn">' + g.fotos.map(function (f, i) {
+            return '<figure data-i="' + i + '"><img src="' + url(f) + '" alt="" draggable="false"' + (i ? ' loading="lazy"' : "") + "></figure>";
+          }).join("") + "</div>" +
+          (n > 1 ? '<button type="button" class="pf l" aria-label="' + esc(T.zurueckFoto) + '">‹</button><button type="button" class="pf r" aria-label="' + esc(T.vor) + '">›</button>' : "") +
+          '<div class="ueber2"><span class="zaehler" id="zaehler"></span><span class="titelmarke" id="titelmarke">★ ' + esc(T.titelbild) + '</span>' +
+          '<button type="button" id="fTitel" title="' + esc(T.titelbild) + '" aria-label="' + esc(T.titelbild) + '">★</button><button type="button" id="fGross" title="' + esc(T.vergroessern) + '" aria-label="' + esc(T.vergroessern) + '">⤢</button><button type="button" id="fWeg" title="' + esc(T.fotoLoeschen) + '" aria-label="' + esc(T.fotoLoeschen) + '">✕</button></div></div>' +
+          (n > 1 ? '<div class="daumen">' + g.fotos.map(function (f, i) { return '<button type="button" data-zu="' + i + '"><img loading="lazy" draggable="false" src="' + url(f) + '" alt=""></button>'; }).join("") + "</div>" : "");
+        var bahn = $("#bahn");
+        function zeige(i, sanft) { akt = Math.max(0, Math.min(n - 1, i)); bahn.scrollTo({ left: akt * bahn.clientWidth, behavior: sanft === false ? "auto" : "smooth" }); stand(); }
+        function stand() {
+          $("#zaehler").textContent = n > 1 ? (akt + 1) + " / " + n : "";
+          $("#titelmarke").hidden = akt !== 0; $("#fTitel").hidden = akt === 0;
+          var l = app.querySelector(".galerie2 .l"), r = app.querySelector(".galerie2 .r"); if (l) l.hidden = akt <= 0; if (r) r.hidden = akt >= n - 1;
+          [].forEach.call(app.querySelectorAll(".daumen [data-zu]"), function (b) { b.setAttribute("aria-current", String(+b.dataset.zu === akt)); });
+        }
+        bahn.addEventListener("scroll", function () { var i = Math.round(bahn.scrollLeft / Math.max(1, bahn.clientWidth)); if (i !== akt) { akt = i; stand(); } }, { passive: true });
+        requestAnimationFrame(function () { zeige(akt, false); });
+        var l = app.querySelector(".galerie2 .l"), r = app.querySelector(".galerie2 .r");
+        if (l) l.onclick = function () { zeige(akt - 1); }; if (r) r.onclick = function () { zeige(akt + 1); };
+        [].forEach.call(app.querySelectorAll(".daumen [data-zu]"), function (b) { b.onclick = function () { zeige(+b.dataset.zu); }; });
+        bahn.onclick = function () { lightbox(g.fotos.map(url), akt); };
+        $("#fGross").onclick = function () { lightbox(g.fotos.map(url), akt); };
+        $("#fWeg").onclick = function () { var f = g.fotos[akt];
+          api("/sammlungen/" + s.id + "/gegenstaende/" + g.id + "/fotos/" + f, { method: "DELETE" }).then(function (r) { g.fotos = r.fotos; fotosZeichnen(); toast(T.gespeichert); }); };
+        $("#fTitel").onclick = function () { var f = g.fotos[akt], neu = [f].concat(g.fotos.filter(function (x) { return x !== f; }));
+          api("/sammlungen/" + s.id + "/gegenstaende/" + g.id + "/fotos", { method: "PUT", body: { fotos: neu } }).then(function (r) { g.fotos = r.fotos; akt = 0; fotosZeichnen(); toast(T.gespeichert); }); };
+        app.querySelector(".galerie2").tabIndex = 0;
+        app.querySelector(".galerie2").addEventListener("keydown", function (e) { if (e.key === "ArrowLeft") zeige(akt - 1); if (e.key === "ArrowRight") zeige(akt + 1); });
       }
-      function fotoEingabe(inp) { inp.value = ""; inp.onchange = function () { fotosHochladen(inp.files, s, g).then(fotosZeichnen); }; inp.click(); }
+      function fotoEingabe(inp) { inp.value = ""; inp.onchange = function () { var vorher = g.fotos.length; fotosHochladen(inp.files, s, g).then(function () { if (g.fotos.length > vorher) akt = vorher; fotosZeichnen(); }); }; inp.click(); }
       fotosZeichnen();
       $("#fotoKamera").onclick = function () { fotoEingabe($("#w-foto")); };
       $("#fotoGalerie").onclick = function () { fotoEingabe($("#w-fotoGalerie")); };
@@ -343,7 +471,7 @@
         var b = offen; offen = {};
         if (!Object.keys(b).length) return;
         api("/sammlungen/" + s.id + "/gegenstaende/" + g.id, { method: "PATCH", body: b }).then(function (neu) {
-          Object.assign(g, { name: neu.name, kategorie: neu.kategorie, ort_id: neu.ort_id, menge: neu.menge, status: neu.status, notizen: neu.notizen, werte: neu.werte });
+          Object.assign(g, { name: neu.name, kategorie: neu.kategorie, tags: neu.tags || [], ort_id: neu.ort_id, menge: neu.menge, status: neu.status, notizen: neu.notizen, werte: neu.werte });
           toast(T.gespeichert);
         }).catch(function () { toast(T.fehler, true); });
       }
@@ -359,15 +487,32 @@
           merken(seg.dataset.seg, b.dataset.v, true);
         });
       });
-      // Kategorie: Chip antippen oder eigene tippen
-      var katFeld = $("#g-kat");
-      $("#katChips").addEventListener("click", function (e) {
-        var b = e.target.closest("button[data-k]"); if (!b) return;
-        var an = b.getAttribute("aria-pressed") !== "true";
-        [].forEach.call(this.querySelectorAll("button[data-k]"), function (x) { x.setAttribute("aria-pressed", String(an && x === b)); });
-        katFeld.value = ""; merken("kategorie", an ? b.dataset.k : "", true);
+      // Tags: gewählte oben (✕ entfernt), Vorschläge der Sammlung antippen, eigene tippen (Enter oder Komma)
+      var tagBox = $("#tagChips");
+      function tagsZeichnen() {
+        var vorschlag = (s.tags || []).filter(function (t) { return g.tags.indexOf(t) < 0; });
+        tagBox.innerHTML = g.tags.map(function (t) { return '<span class="chip an tagan">#' + esc(t) + '<button type="button" data-tweg="' + esc(t) + '" aria-label="' + esc(T.loeschen + " " + t) + '">✕</button></span>'; }).join("") +
+          vorschlag.map(function (t) { return '<button type="button" class="chip" data-tdazu="' + esc(t) + '">＋ ' + esc(t) + "</button>"; }).join("") +
+          '<input id="g-tag" class="chipfeld" placeholder="' + esc(T.tagNeu) + '" autocomplete="off" enterkeyhint="done">';
+        var f = $("#g-tag");
+        f.addEventListener("keydown", function (e) {
+          if ((e.key === "Enter" || e.key === ",") && f.value.trim()) { e.preventDefault(); var v = f.value; f.value = ""; tagDazu(v); setTimeout(function () { var n = $("#g-tag"); if (n) n.focus(); }, 0); }
+          if (e.key === "Backspace" && !f.value && g.tags.length) { tagWeg(g.tags[g.tags.length - 1]); setTimeout(function () { var n = $("#g-tag"); if (n) n.focus(); }, 0); }
+        });
+        f.addEventListener("blur", function () { if (f.value.trim()) { var v = f.value; f.value = ""; tagDazu(v); } });
+      }
+      function tagDazu(t) {
+        t = String(t).replace(/[,;]/g, " ").replace(/\s+/g, " ").trim().replace(/^#/, "").slice(0, 40); if (!t) return;
+        if (!g.tags.some(function (x) { return x.toLowerCase() === t.toLowerCase(); })) g.tags.push(t);
+        if (!(s.tags || []).some(function (x) { return x.toLowerCase() === t.toLowerCase(); })) s.tags = (s.tags || []).concat([t]);
+        tagsZeichnen(); merken("tags", g.tags.slice(), true);
+      }
+      function tagWeg(t) { g.tags = g.tags.filter(function (x) { return x !== t; }); tagsZeichnen(); merken("tags", g.tags.slice(), true); }
+      tagBox.addEventListener("click", function (e) {
+        var a = e.target.closest("[data-tweg]"), b = e.target.closest("[data-tdazu]");
+        if (a) tagWeg(a.dataset.tweg); if (b) tagDazu(b.dataset.tdazu);
       });
-      katFeld.addEventListener("input", function () { [].forEach.call($("#katChips").querySelectorAll("button[data-k]"), function (x) { x.setAttribute("aria-pressed", "false"); }); });
+      tagsZeichnen();
       // Menge −/+
       [].forEach.call(app.querySelectorAll(".zahlfeld button"), function (b) {
         b.onclick = function () { var m = $("#g-menge"), n = Math.max(0, (parseFloat(String(m.value).replace(",", ".")) || 0) + +b.dataset.d); m.value = n; merken("menge", n, true); };
@@ -392,14 +537,35 @@
       neuIn.addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); ortAnlegen(); } if (e.key === "Escape") { neuBox.hidden = true; ortSel.value = g.ort_id || ""; } });
 
       $("#loeschen").onclick = function () {
-        if (!confirm(T.gegenstandLoeschen)) return;
-        api("/sammlungen/" + s.id + "/gegenstaende/" + g.id, { method: "DELETE" }).then(function () {
-          j.gegenstaende = j.gegenstaende.filter(function (x) { return x.id !== g.id; }); location.hash = "#/s/" + s.id;
+        fragen(T.gegenstandLoeschen, fmt(T.dingWegFrage, g.name || nrText(g)), T.loeschen).then(function (ja) {
+          if (!ja) return;
+          api("/sammlungen/" + s.id + "/gegenstaende/" + g.id, { method: "DELETE" }).then(function () {
+            j.gegenstaende = j.gegenstaende.filter(function (x) { return x.id !== g.id; }); location.hash = "#/s/" + s.id;
+          });
         });
       };
       $("#qrDing").onclick = function () { qrZeigen(T.qrDing, location.origin + "/#/s/" + s.id + "/g/" + g.id, nrText(g)); };
       if (!g.name && !g.fotos.length) $("#g-name").focus();
     });
+  }
+
+  // Großansicht (ganzer Bildschirm) zum Durchblättern
+  function lightbox(bilder, start) {
+    var d = document.createElement("dialog"), i = start || 0, n = bilder.length;
+    d.className = "lightbox";
+    d.innerHTML = '<div class="bahn">' + bilder.map(function (u) { return '<figure><img src="' + esc(u) + '" alt="" draggable="false"></figure>'; }).join("") + "</div>" +
+      '<button type="button" class="x" aria-label="X">✕</button>' + (n > 1 ? '<button type="button" class="pf l" aria-label="' + esc(T.zurueckFoto) + '">‹</button><button type="button" class="pf r" aria-label="' + esc(T.vor) + '">›</button><span class="zaehler"></span>' : "");
+    document.body.appendChild(d); d.showModal();
+    var bahn = d.querySelector(".bahn");
+    function stand() { var z = d.querySelector(".zaehler"); if (z) z.textContent = (i + 1) + " / " + n; var l = d.querySelector(".l"), r = d.querySelector(".r"); if (l) l.hidden = i <= 0; if (r) r.hidden = i >= n - 1; }
+    function zeige(j, sanft) { i = Math.max(0, Math.min(n - 1, j)); bahn.scrollTo({ left: i * bahn.clientWidth, behavior: sanft === false ? "auto" : "smooth" }); stand(); }
+    bahn.addEventListener("scroll", function () { var j = Math.round(bahn.scrollLeft / Math.max(1, bahn.clientWidth)); if (j !== i) { i = j; stand(); } }, { passive: true });
+    requestAnimationFrame(function () { zeige(i, false); });
+    if (n > 1) { d.querySelector(".l").onclick = function () { zeige(i - 1); }; d.querySelector(".r").onclick = function () { zeige(i + 1); }; }
+    d.addEventListener("keydown", function (e) { if (e.key === "ArrowLeft") zeige(i - 1); if (e.key === "ArrowRight") zeige(i + 1); });
+    d.querySelector(".x").onclick = function () { d.close(); };
+    d.addEventListener("click", function (e) { if (e.target === d || e.target.tagName === "FIGURE") d.close(); });
+    d.addEventListener("close", function () { d.remove(); });
   }
 
   function qrZeigen(titel, text, name) {
@@ -414,7 +580,7 @@
   W.neu.onclick = function () {
     var s = S.akt.sammlung, vorbelegt = {};
     if (S.filter.o) vorbelegt.ort_id = S.filter.o;
-    if (S.filter.k) vorbelegt.kategorie = S.filter.k;
+    if (S.filter.t.length) vorbelegt.tags = S.filter.t.slice();
     api("/sammlungen/" + s.id + "/gegenstaende", { method: "POST", body: vorbelegt }).then(function (g) {
       S.akt.gegenstaende.push(g); location.hash = "#/s/" + s.id + "/g/" + g.id;
       if (window.cleeb) cleeb.ereignis("angelegt");
@@ -529,9 +695,9 @@
   function zuordnen(d, tab) {
     if (tab.length < 2) { toast(L === "en" ? "No rows found" : "Keine Zeilen gefunden", true); return; }
     var s = S.akt.sammlung, kopf = tab[0], daten = tab.slice(1);
-    var ziele = [["", T.ignorieren], ["name", T.name], ["kategorie", T.kategorie], ["ort", T.ort], ["menge", T.menge], ["status", T.status], ["notizen", T.notizen]]
+    var ziele = [["", T.ignorieren], ["name", T.name], ["tags", T.tags], ["ort", T.ort], ["menge", T.menge], ["status", T.status], ["notizen", T.notizen]]
       .concat(s.felder.map(function (f) { return ["w:" + f.id, feldName(f)]; })).concat([["+", T.neuesFeld]]);
-    var synonyme = { name: ["name", "bezeichnung", "titel", "instrument", "gerät", "gegenstand", "item", "title"], kategorie: ["kategorie", "category", "art", "typ"],
+    var synonyme = { name: ["name", "bezeichnung", "titel", "instrument", "gerät", "gegenstand", "item", "title"], tags: ["tags", "tag", "schlagworte", "kategorie", "kategorien", "category", "categories", "art", "typ"],
       ort: ["ort", "raum", "raumstandort", "standort", "place", "location", "box", "regal"], menge: ["menge", "anzahl", "stück", "quantity", "qty"], status: ["status"], notizen: ["notizen", "notiz", "bemerkung", "notes"] };
     function raten(h) {
       var n = NORM(h); if (!n || n === "id" || n === "nr") return "";
@@ -590,6 +756,9 @@
         '<div class="reihe"><div class="feld"><label for="e-vorlage">' + esc(T.vorlage) + '</label><select id="e-vorlage">' + Object.keys(v).map(function (k) { return '<option value="' + k + '"' + (s.vorlage === k ? " selected" : "") + ">" + v[k].icon + " " + esc(v[k][L]) + "</option>"; }).join("") + "</select></div>" +
         '<div class="feld klein"><label for="e-praefix">' + esc(T.praefix) + '</label><input id="e-praefix" value="' + esc(s.praefix) + '" maxlength="6"></div></div>' +
         "<h3>" + esc(T.daten) + '</h3><div class="reihe knoepfe"><a class="knopf leise" href="/api/sammlungen/' + s.id + '/export.csv" download>⬇ ' + esc(T.export) + '</a><button type="button" class="knopf leise" id="i-datei">⬆ ' + esc(T.import) + '</button></div><div id="i-zuordnung"></div>' +
+        "<h3>" + esc(T.tagsVerwalten) + '</h3><div class="chips kat" id="e-tags">' + (s.tags || []).map(function (t) {
+          return '<span class="chip an tagan">#' + esc(t) + '<button type="button" data-tweg="' + esc(t) + '" aria-label="' + esc(T.loeschen + " " + t) + '">✕</button></span>'; }).join("") +
+          '<input id="e-tag" class="chipfeld" placeholder="' + esc(T.tagNeu) + '" autocomplete="off"></div>' +
         "<h3>" + esc(T.felder) + '</h3><ul class="feldliste">' + s.felder.map(function (f, i) {
           return '<li data-i="' + i + '" draggable="true"><span class="griff" aria-hidden="true">⋮⋮</span><input value="' + esc(feldName(f)) + '" aria-label="' + esc(T.name) + '">' +
             '<select aria-label="Typ">' + Object.keys(T.typ).map(function (k) { return '<option value="' + k + '"' + (f.typ === k ? " selected" : "") + ">" + esc(T.typ[k]) + "</option>"; }).join("") + "</select>" +
@@ -613,9 +782,29 @@
         speichern({ felder: s.felder }, true);
       };
       d.querySelector("#e-weg").onclick = function () {
-        var antwort = prompt(T.loeschenFrage);
-        if (antwort == null || antwort.trim() !== s.name.trim()) return;
-        api("/sammlungen/" + s.id, { method: "DELETE" }).then(function () { S.akt = null; d.close(); location.hash = "#/"; });
+        sammlungLoeschen(s).then(function (weg) { if (weg) { S.akt = null; d.close(); location.hash = "#/"; } });
+      };
+      [].forEach.call(d.querySelectorAll("#e-tags [data-tweg]"), function (b) {
+        b.onclick = function () {
+          var t = b.dataset.tweg;
+          fragen(T.tagsVerwalten, fmt(T.tagWegFrage, t), T.loeschen).then(function (ja) {
+            if (!ja) return;
+            api("/sammlungen/" + s.id, { method: "PATCH", body: { tagWeg: t } }).then(function (neu) {
+              Object.assign(s, neu);
+              S.akt.gegenstaende.forEach(function (g) { g.tags = (g.tags || []).filter(function (x) { return x !== t; }); });
+              S.filter.t = S.filter.t.filter(function (x) { return x !== t; });
+              toast(T.gespeichert); zeichnen();
+            }, function () { toast(T.fehler, true); });
+          });
+        };
+      });
+      var et = d.querySelector("#e-tag");
+      et.onkeydown = function (e) {
+        if ((e.key === "Enter" || e.key === ",") && et.value.trim()) {
+          e.preventDefault(); var t = et.value.replace(/^#/, "").trim();
+          speichern({ tags: (s.tags || []).concat([t]) }, true);
+          setTimeout(function () { var n = d.querySelector("#e-tag"); if (n) n.focus(); }, 300);
+        }
       };
     }
     d = dialog(T.einstellungen, "", function () { if (S.akt) { document.title = s.name + " · Inventar"; zeichneSammlung(); } });

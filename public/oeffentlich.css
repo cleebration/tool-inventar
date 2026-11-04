@@ -40,3 +40,12 @@ cleebration-leiste > input[type=search]{all:unset;box-sizing:border-box;width:10
 
 /* Text auf Glas-Flächen folgt der Leiste (Grundsatz 9); Text direkt auf dem Seiten-Hintergrund folgt hell/dunkel */
 .karte,.hinweis,.chips button:not([aria-pressed=true]),dialog{color:var(--cleeb-text,var(--ink))}
+/* Galerie im großen Fenster */
+dialog .galerie{position:relative;width:min(860px,calc(100vw - 44px));margin-bottom:10px}
+dialog .bahn{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;border-radius:14px}
+dialog .bahn::-webkit-scrollbar{display:none}
+dialog .bahn img{flex:0 0 100%;scroll-snap-align:center;object-fit:contain;width:100%;height:min(70vh,640px);max-height:none;margin:0;border-radius:0;background:rgba(0,0,0,.25)}
+dialog .pf{position:absolute;top:50%;transform:translateY(-50%);width:44px;height:44px;border-radius:50%;border:0;background:rgba(0,0,0,.45);color:#fff;font-size:28px;line-height:1;cursor:pointer}
+dialog .pf.l{left:8px}dialog .pf.r{right:8px}dialog .pf[hidden]{display:none}
+dialog .zaehler{position:absolute;bottom:8px;left:50%;transform:translateX(-50%);margin:0;padding:2px 10px;border-radius:99px;background:rgba(0,0,0,.45);color:#fff;font-size:13px}
+dialog .zaehler:empty{display:none}

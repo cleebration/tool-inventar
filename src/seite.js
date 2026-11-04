@@ -25,7 +25,9 @@ export function oeffentlicheSeite({ s, gegenstaende, orte, lang, token, besitzer
   const t = T[lang] || T.de;
   const felder = s.felder.filter(f => !f.aus && f.oeffentlich);
   const q = token ? "?t=" + encodeURIComponent(token) : "";
-  const kategorien = [...new Set(gegenstaende.map(g => g.kategorie).filter(Boolean))].sort((a, b) => a.localeCompare(b, lang));
+  const tags = [...new Set(gegenstaende.flatMap(g => g.tags || []))].sort((a, b) => a.localeCompare(b, lang));
+  const zurueck = encodeURIComponent("/o/" + s.slug + q);
+  const andere = "/sprache?l=" + (lang === "en" ? "de" : "en") + "&zurueck=" + zurueck;
   const wert = (f, v) => v === true ? t.ja : v === false ? t.nein : esc(v);
 
   const karten = gegenstaende.map(g => {
@@ -34,11 +36,11 @@ export function oeffentlicheSeite({ s, gegenstaende, orte, lang, token, besitzer
     const zeilen = felder.filter(f => g.werte[f.id] != null && g.werte[f.id] !== "")
       .map(f => `<div class="z"><dt>${esc(lang === "en" ? f.en : f.de)}</dt><dd>${wert(f, g.werte[f.id])}</dd></div>`).join("");
     const ort = ortKurz(orte, g.ort_id);
-    const such = [g.name, g.kategorie, ort, ...felder.map(f => g.werte[f.id])].filter(v => v != null).join(" ").toLowerCase();
-    return `<article class="karte" data-k="${esc(g.kategorie)}" data-s="${esc(such)}">
+    const such = [g.name, ...(g.tags || []), ort, ...felder.map(f => g.werte[f.id])].filter(v => v != null).join(" ").toLowerCase();
+    return `<article class="karte" data-k="${esc(JSON.stringify(g.tags || []))}" data-s="${esc(such)}">
   <button class="bild" type="button" aria-label="${esc(g.name)}">${bild}</button>
   <div class="text"><h2>${esc(g.name || "—")}</h2>
-  <p class="meta">${[g.kategorie, ort, g.menge !== 1 ? `${t.menge} ${esc(g.menge)}` : "", g.status === "verliehen" ? t.verliehen : ""].filter(Boolean).map(esc).join(" · ")}</p>
+  <p class="meta">${[(g.tags || []).join(", "), ort, g.menge !== 1 ? `${t.menge} ${esc(g.menge)}` : "", g.status === "verliehen" ? t.verliehen : ""].filter(Boolean).map(esc).join(" · ")}</p>
   ${zeilen ? `<dl>${zeilen}</dl>` : ""}${mehr ? `<div class="mehr" hidden>${mehr}</div>` : ""}</div></article>`;
   }).join("\n");
 
@@ -50,13 +52,13 @@ ${s.sicht === "oeffentlich" ? "" : '<meta name="robots" content="noindex">'}
 <script src="${STORE}/kit.js" data-produkt="inventar" defer></script>
 <link rel="stylesheet" href="/oeffentlich.css">
 </head><body>
-<cleebration-leiste tool="inventar" lang="${lang}"${name ? ` name="${esc(name)}"` : ""}${besitzer ? ` bearbeiten="/#/s/${s.id}" bearbeiten-text="${t.bearbeiten}"` : ""}>
+<cleebration-leiste tool="inventar" lang="${lang}" sprache="${esc(andere)}"${name ? ` name="${esc(name)}"` : ""}${besitzer ? ` bearbeiten="/#/s/${s.id}" bearbeiten-text="${t.bearbeiten}"` : ""}>
   <input data-icon="suche" data-icon-breit title="${t.suche}" type="search" id="suche" placeholder="${t.suche}" aria-label="${t.suche}">
 </cleebration-leiste>
 <main>
   <header class="kopf"><h1>${esc(s.name)}</h1><p>${gegenstaende.length} ${t.stueck}</p>
   ${besitzer && s.sicht === "privat" ? `<p class="hinweis">${t.privatHinweis}</p>` : ""}
-  ${kategorien.length > 1 ? `<nav class="chips"><button type="button" aria-pressed="true" data-k="">${t.alle}</button>${kategorien.map(k => `<button type="button" aria-pressed="false" data-k="${esc(k)}">${esc(k)}</button>`).join("")}</nav>` : ""}
+  ${tags.length > 1 ? `<nav class="chips"><button type="button" aria-pressed="true" data-k="">${t.alle}</button>${tags.map(k => `<button type="button" aria-pressed="false" data-k="${esc(k)}">${esc(k)}</button>`).join("")}</nav>` : ""}
   </header>
   <section class="raster" id="raster">${karten || `<p class="leer">${t.leer}</p>`}</section>
   <details class="melden"><summary>${t.melden}</summary>
@@ -64,15 +66,28 @@ ${s.sicht === "oeffentlich" ? "" : '<meta name="robots" content="noindex">'}
     <textarea name="text" maxlength="1000" rows="3"></textarea><button type="submit">${t.senden}</button></form></details>
 </main>
 <cleebration-fuss produkt="inventar" name="Inventar" eigen="${lang === "en" ? "Create your own inventory for free" : "Eigenes Inventar gratis erstellen"}"></cleebration-fuss>
-<dialog id="gross"><button type="button" class="x" aria-label="X">✕</button><div id="grossInhalt"></div></dialog>
+<dialog id="gross"><button type="button" class="x" aria-label="X">✕</button>
+  <div class="galerie"><div class="bahn" id="bahn"></div><button type="button" class="pf l" aria-label="‹">‹</button><button type="button" class="pf r" aria-label="›">›</button><p class="zaehler" id="zaehler"></p></div>
+  <div id="grossInhalt"></div></dialog>
 <script>
 (function(){
-  var suche=document.getElementById("suche"),karten=[].slice.call(document.querySelectorAll(".karte")),kat="";
-  function filtern(){var q=(suche&&suche.value||"").toLowerCase().trim();karten.forEach(function(k){k.hidden=!!((kat&&k.dataset.k!==kat)||(q&&k.dataset.s.indexOf(q)<0));});}
+  var suche=document.getElementById("suche"),karten=[].slice.call(document.querySelectorAll(".karte")),gew=[];
+  karten.forEach(function(k){try{k._t=JSON.parse(k.dataset.k||"[]");}catch(e){k._t=[];}});
+  function filtern(){var q=(suche&&suche.value||"").toLowerCase().trim();karten.forEach(function(k){k.hidden=!!(gew.some(function(t){return k._t.indexOf(t)<0;})||(q&&k.dataset.s.indexOf(q)<0));});}
   if(suche)suche.addEventListener("input",filtern);
-  [].forEach.call(document.querySelectorAll(".chips button"),function(b){b.onclick=function(){kat=b.dataset.k;[].forEach.call(document.querySelectorAll(".chips button"),function(x){x.setAttribute("aria-pressed",String(x===b));});filtern();};});
-  var d=document.getElementById("gross"),di=document.getElementById("grossInhalt");
-  karten.forEach(function(k){k.querySelector(".bild").onclick=function(){var bilder=[].slice.call(k.querySelectorAll("img")).map(function(i){return '<img src="'+i.src+'" alt="">';}).join("");di.innerHTML=bilder+k.querySelector(".text").outerHTML.replace(' hidden','');d.showModal();};});
+  var chips=[].slice.call(document.querySelectorAll(".chips button"));
+  chips.forEach(function(b){b.onclick=function(){var k=b.dataset.k;if(!k)gew=[];else{var i=gew.indexOf(k);if(i<0)gew.push(k);else gew.splice(i,1);}
+    chips.forEach(function(x){x.setAttribute("aria-pressed",String(x.dataset.k?gew.indexOf(x.dataset.k)>=0:!gew.length));});filtern();};});
+  // Galerie: alle Fotos eines Gegenstands zum Durchblättern (Pfeile, Wischen, Tasten)
+  var d=document.getElementById("gross"),di=document.getElementById("grossInhalt"),bahn=document.getElementById("bahn"),z=document.getElementById("zaehler"),n=0,i=0;
+  function zeige(j){i=Math.max(0,Math.min(n-1,j));bahn.scrollTo({left:i*bahn.clientWidth,behavior:"smooth"});z.textContent=n>1?(i+1)+" / "+n:"";
+    d.querySelector(".l").hidden=i<=0;d.querySelector(".r").hidden=i>=n-1;}
+  karten.forEach(function(k){k.querySelector(".bild").onclick=function(){var b=[].slice.call(k.querySelectorAll("img"));n=b.length;
+    bahn.innerHTML=b.map(function(x){return '<img src="'+x.src+'" alt="">';}).join("");d.querySelector(".galerie").hidden=!n;
+    di.innerHTML=k.querySelector(".text").outerHTML.replace(' hidden','');var m=di.querySelector(".mehr");if(m)m.remove();d.showModal();bahn.scrollLeft=0;zeige(0);};});
+  d.querySelector(".l").onclick=function(){zeige(i-1);};d.querySelector(".r").onclick=function(){zeige(i+1);};
+  bahn.addEventListener("scroll",function(){var j=Math.round(bahn.scrollLeft/Math.max(1,bahn.clientWidth));if(j!==i){i=j;z.textContent=n>1?(i+1)+" / "+n:"";d.querySelector(".l").hidden=i<=0;d.querySelector(".r").hidden=i>=n-1;}},{passive:true});
+  d.addEventListener("keydown",function(e){if(e.key==="ArrowLeft")zeige(i-1);if(e.key==="ArrowRight")zeige(i+1);});
   d.querySelector(".x").onclick=function(){d.close();};d.addEventListener("click",function(e){if(e.target===d)d.close();});
   var f=document.getElementById("meldung");
   f.onsubmit=function(e){e.preventDefault();fetch("/api/melden",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({slug:${JSON.stringify(s.slug)},grund:f.grund.value,text:f.text.value})}).then(function(){f.innerHTML="<p>${t.gemeldet}</p>";});};

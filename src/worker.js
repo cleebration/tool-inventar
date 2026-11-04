@@ -56,6 +56,14 @@ async function weiter(request, env, ctx, k) {
   m = p.match(/^\/f\/([A-Za-z0-9_-]{1,24})\/([A-Za-z0-9_-]{1,24})\/([A-Za-z0-9_-]{1,24}\.jpg)$/);
   if (m && request.method === "GET") return foto(request, env, k, m[1], m[2], m[3], url);
 
+  // Sprache umschalten (Leiste → Zahnrad → Sprache): Cookie wie der Store, zurück auf dieselbe Seite
+  if (p === "/sprache" && request.method === "GET") {
+    const l = url.searchParams.get("l") === "en" ? "en" : "de";
+    const h = new Headers({ Location: url.origin + nurIntern(url.searchParams.get("zurueck") || "/"), "Cache-Control": "no-store" });
+    h.append("Set-Cookie", `cleeb_lang=${l}; Path=/; Secure; SameSite=Lax; Max-Age=31536000`);
+    return new Response(null, { status: 302, headers: h });
+  }
+
   // Besucher melden einen Inhalt (zentral in der Meldungen-Inbox des Stores)
   if (p === "/api/melden" && request.method === "POST") {
     if (!k.herkunftOk(request)) return fehler(403, "Herkunft");
@@ -82,7 +90,7 @@ async function weiter(request, env, ctx, k) {
     const roh = await env.ASSETS.fetch(new Request(url.origin + "/index.html"));
     const neu = new HTMLRewriter()
       .on("html", { element: el => el.setAttribute("lang", lang) })
-      .on("cleebration-leiste", { element: el => { el.setAttribute("name", se.name); el.setAttribute("lang", lang); } })
+      .on("cleebration-leiste", { element: el => { el.setAttribute("name", se.name); el.setAttribute("lang", lang); el.setAttribute("sprache", "/sprache?l=" + (lang === "en" ? "de" : "en") + "&zurueck=%2F"); } })
       .on("cleebration-fuss", { element: el => el.setAttribute("eigen", lang === "en" ? "Create your own inventory for free" : "Eigenes Inventar gratis erstellen") })
       .transform(roh);
     return k.sicher(neu, { html: true });
@@ -107,7 +115,7 @@ async function api(request, env, ctx, k, se, url, lang) {
 
   if (p === "/api/start" && M === "GET") {
     let { results } = await db.prepare(`SELECT s.*, (SELECT COUNT(*) FROM gegenstaende g WHERE g.sammlung_id = s.id) AS anzahl
-      FROM sammlungen s WHERE konto_id = ?1 ORDER BY geaendert DESC`).bind(se.konto_id).all();
+      FROM sammlungen s WHERE konto_id = ?1 ORDER BY pos, erstellt`).bind(se.konto_id).all();
     results = results || [];
     // Grundsatz 6: wer noch nichts hat, bekommt sofort etwas zum Bearbeiten
     if (!results.length) {
@@ -115,6 +123,17 @@ async function api(request, env, ctx, k, se, url, lang) {
       results = [{ ...s, anzahl: 0 }];
     }
     return json(200, { name: se.name, grenzen, vorlagen: VORLAGEN, status: STATUS, sammlungen: results.map(sammlungAus) });
+  }
+
+  // Reihenfolge der Sammlungen (Drag & Drop in der Übersicht)
+  if (p === "/api/sammlungen/reihenfolge" && M === "PUT") {
+    const b = await request.json().catch(() => ({}));
+    const ids = Array.isArray(b.ids) ? b.ids.map(String).slice(0, 500) : [];
+    const { results } = await db.prepare("SELECT id FROM sammlungen WHERE konto_id = ?1").bind(se.konto_id).all();
+    const eigene = new Set((results || []).map(r => r.id));
+    const st = ids.filter(x => eigene.has(x)).map((x, i) => db.prepare("UPDATE sammlungen SET pos = ?2 WHERE id = ?1").bind(x, i));
+    if (st.length) await db.batch(st);
+    return json(200, { ok: true });
   }
 
   if (p === "/api/sammlungen" && M === "POST") {
@@ -133,10 +152,10 @@ async function api(request, env, ctx, k, se, url, lang) {
 
     if (rest === "" && M === "GET") {
       const [g, o] = await Promise.all([
-        db.prepare("SELECT * FROM gegenstaende WHERE sammlung_id = ?1 ORDER BY nr").bind(s.id).all(),
+        db.prepare("SELECT * FROM gegenstaende WHERE sammlung_id = ?1 ORDER BY pos, nr").bind(s.id).all(),
         db.prepare("SELECT * FROM orte WHERE sammlung_id = ?1 ORDER BY pos, name").bind(s.id).all(),
       ]);
-      return json(200, { sammlung: sammlungAus(s), gegenstaende: (g.results || []).map(gegenstandAus), orte: o.results || [], grenzen });
+      return json(200, { sammlung: sammlungAus(s, g.results || []), gegenstaende: (g.results || []).map(gegenstandAus), orte: o.results || [], grenzen });
     }
 
     if (rest === "" && M === "PATCH") {
@@ -159,16 +178,44 @@ async function api(request, env, ctx, k, se, url, lang) {
         neu.slug = sl;
       }
       if (b.neuerLink) neu.link_token = zufall(18);
-      await db.prepare("UPDATE sammlungen SET name=?2, sicht=?3, praefix=?4, felder=?5, vorlage=?6, slug=?7, link_token=?8, geaendert=?9 WHERE id=?1")
-        .bind(s.id, neu.name, neu.sicht, neu.praefix, neu.felder, neu.vorlage, neu.slug, neu.link_token, jetzt()).run();
+      if (Array.isArray(b.tags)) neu.tags = JSON.stringify(tagsPruefen(b.tags));
+      if (b.tagWeg != null || b.tagUm) {
+        // Tag aus der Sammlung entfernen bzw. umbenennen – auch bei allen Gegenständen
+        const alt = text(b.tagWeg != null ? b.tagWeg : b.tagUm.von, 40), zu = b.tagUm ? text(b.tagUm.zu, 40).trim() : "";
+        const liste = tagsDerSammlung(neu, await alleTags(db, s.id));
+        neu.tags = JSON.stringify(tagsPruefen(liste.flatMap(t => (t === alt ? (zu ? [zu] : []) : [t]))));
+        const { results } = await db.prepare("SELECT id, tags FROM gegenstaende WHERE sammlung_id = ?1").bind(s.id).all();
+        const st = [];
+        for (const r of results || []) {
+          const tg = JSON.parse(r.tags || "[]");
+          if (!tg.includes(alt)) continue;
+          const nt = tagsPruefen(tg.flatMap(t => (t === alt ? (zu ? [zu] : []) : [t])));
+          st.push(db.prepare("UPDATE gegenstaende SET tags = ?2, kategorie = ?3 WHERE id = ?1").bind(r.id, JSON.stringify(nt), nt[0] || ""));
+        }
+        if (st.length) await db.batch(st);
+      }
+      await db.prepare("UPDATE sammlungen SET name=?2, sicht=?3, praefix=?4, felder=?5, vorlage=?6, slug=?7, link_token=?8, tags=?10, geaendert=?9 WHERE id=?1")
+        .bind(s.id, neu.name, neu.sicht, neu.praefix, neu.felder, neu.vorlage, neu.slug, neu.link_token, jetzt(), neu.tags ?? null).run();
       if (neu.sicht !== s.sicht && neu.sicht !== "privat") await k.ereignis(se, "geteilt");
       ctx.waitUntil(meineSachen(k, se, url, neu));
-      return json(200, sammlungAus(neu));
+      return json(200, sammlungAus(neu, null, await alleTags(db, s.id)));
     }
 
     if (rest === "" && M === "DELETE") {
       await sammlungLoeschen(env, s.id);
       ctx.waitUntil(k.inhaltWeg(se, s.id));
+      return json(200, { ok: true });
+    }
+
+    // Reihenfolge der Gegenstände (Kacheln per Drag & Drop)
+    if (rest === "/reihenfolge" && M === "PUT") {
+      const b = await request.json().catch(() => ({}));
+      const ids = Array.isArray(b.ids) ? b.ids.map(String).slice(0, 5000) : [];
+      const { results } = await db.prepare("SELECT id FROM gegenstaende WHERE sammlung_id = ?1").bind(s.id).all();
+      const da = new Set((results || []).map(r => r.id));
+      const st = ids.filter(x => da.has(x)).map((x, i) => db.prepare("UPDATE gegenstaende SET pos = ?2 WHERE id = ?1").bind(x, i));
+      for (let i = 0; i < st.length; i += 90) await db.batch(st.slice(i, i + 90));
+      await beruehrt(db, s.id);
       return json(200, { ok: true });
     }
 
@@ -229,8 +276,8 @@ async function api(request, env, ctx, k, se, url, lang) {
       if (!mg[2] && M === "PATCH") {
         const b = await request.json().catch(() => ({}));
         const neu = await felderSetzen(db, s, g, b);
-        await db.prepare("UPDATE gegenstaende SET name=?2, kategorie=?3, ort_id=?4, menge=?5, status=?6, werte=?7, notizen=?8, geaendert=?9 WHERE id=?1")
-          .bind(g.id, neu.name, neu.kategorie, neu.ort_id, neu.menge, neu.status, neu.werte, neu.notizen, jetzt()).run();
+        await db.prepare("UPDATE gegenstaende SET name=?2, kategorie=?3, ort_id=?4, menge=?5, status=?6, werte=?7, notizen=?8, geaendert=?9, tags=?10 WHERE id=?1")
+          .bind(g.id, neu.name, neu.kategorie, neu.ort_id, neu.menge, neu.status, neu.werte, neu.notizen, jetzt(), neu.tags).run();
         await beruehrt(db, s.id);
         return json(200, gegenstandAus({ ...g, ...neu, geaendert: jetzt() }));
       }
@@ -312,7 +359,7 @@ async function api(request, env, ctx, k, se, url, lang) {
 
     if (rest === "/export.csv" && M === "GET") {
       const [g, o] = await Promise.all([
-        db.prepare("SELECT * FROM gegenstaende WHERE sammlung_id = ?1 ORDER BY nr").bind(s.id).all(),
+        db.prepare("SELECT * FROM gegenstaende WHERE sammlung_id = ?1 ORDER BY pos, nr").bind(s.id).all(),
         db.prepare("SELECT * FROM orte WHERE sammlung_id = ?1").bind(s.id).all(),
       ]);
       await k.ereignis(se, "exportiert");
@@ -338,9 +385,11 @@ async function sammlungAnlegen(env, k, se, url, { name, vorlage }) {
     felder: JSON.stringify(felderAus(v)), sicht: "privat", slug, link_token: zufall(18),
     praefix: VORLAGEN[v].praefix, naechste_nr: 1, erstellt: jetzt(), geaendert: jetzt(),
   };
-  await db.prepare(`INSERT INTO sammlungen (id, konto_id, name, vorlage, felder, sicht, slug, link_token, praefix, naechste_nr, erstellt, geaendert)
-    VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12)`)
-    .bind(s.id, s.konto_id, s.name, s.vorlage, s.felder, s.sicht, s.slug, s.link_token, s.praefix, s.naechste_nr, s.erstellt, s.geaendert).run();
+  const mx = await db.prepare("SELECT COALESCE(MAX(pos), -1) + 1 AS p FROM sammlungen WHERE konto_id = ?1").bind(se.konto_id).first();
+  s.pos = mx ? mx.p : 0;
+  await db.prepare(`INSERT INTO sammlungen (id, konto_id, name, vorlage, felder, sicht, slug, link_token, praefix, naechste_nr, erstellt, geaendert, pos)
+    VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13)`)
+    .bind(s.id, s.konto_id, s.name, s.vorlage, s.felder, s.sicht, s.slug, s.link_token, s.praefix, s.naechste_nr, s.erstellt, s.geaendert, s.pos).run();
   await meineSachen(k, se, url, s);
   return s;
 }
@@ -365,20 +414,26 @@ async function gegenstandAnlegen(db, s, b, ausImport = false) {
   const r = await db.prepare("UPDATE sammlungen SET naechste_nr = naechste_nr + 1, geaendert = ?2 WHERE id = ?1 RETURNING naechste_nr - 1 AS nr")
     .bind(s.id, jetzt()).first();
   const nr = r ? r.nr : s.naechste_nr;
-  const leer = { name: "", kategorie: "", ort_id: null, menge: 1, status: "vorhanden", werte: "{}", notizen: "" };
+  const leer = { name: "", kategorie: "", tags: "[]", ort_id: null, menge: 1, status: "vorhanden", werte: "{}", notizen: "" };
   const werte = await felderSetzen(db, s, leer, b, ausImport);
-  const g = { id: id(), sammlung_id: s.id, nr, ...werte, fotos: "[]", erstellt: jetzt(), geaendert: jetzt() };
-  await db.prepare(`INSERT INTO gegenstaende (id, sammlung_id, nr, name, kategorie, ort_id, menge, status, werte, notizen, fotos, erstellt, geaendert)
-    VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13)`)
-    .bind(g.id, g.sammlung_id, g.nr, g.name, g.kategorie, g.ort_id, g.menge, g.status, g.werte, g.notizen, g.fotos, g.erstellt, g.geaendert).run();
+  const mx = await db.prepare("SELECT COALESCE(MAX(pos), 0) + 1 AS p FROM gegenstaende WHERE sammlung_id = ?1").bind(s.id).first();
+  const g = { id: id(), sammlung_id: s.id, nr, ...werte, fotos: "[]", erstellt: jetzt(), geaendert: jetzt(), pos: mx ? mx.p : nr };
+  await db.prepare(`INSERT INTO gegenstaende (id, sammlung_id, nr, name, kategorie, ort_id, menge, status, werte, notizen, fotos, erstellt, geaendert, tags, pos)
+    VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15)`)
+    .bind(g.id, g.sammlung_id, g.nr, g.name, g.kategorie, g.ort_id, g.menge, g.status, g.werte, g.notizen, g.fotos, g.erstellt, g.geaendert, g.tags, g.pos).run();
   return g;
 }
 
 // Übernimmt nur bekannte Felder; Werte nach Typ prüfen
 async function felderSetzen(db, s, g, b, ortGeprueft = false) {
-  const neu = { name: g.name, kategorie: g.kategorie, ort_id: g.ort_id, menge: g.menge, status: g.status, notizen: g.notizen };
+  const neu = { name: g.name, kategorie: g.kategorie, tags: g.tags || "[]", ort_id: g.ort_id, menge: g.menge, status: g.status, notizen: g.notizen };
   if (b.name != null) neu.name = text(b.name, 200);
-  if (b.kategorie != null) neu.kategorie = text(b.kategorie, 80);
+  // Tags (mehrere je Gegenstand); „kategorie“ bleibt für alte Aufrufe/Import: Komma-Liste → Tags
+  let tags = null;
+  if (Array.isArray(b.tags)) tags = b.tags;
+  else if (b.tags != null) tags = String(b.tags).split(/[,;]/);
+  else if (b.kategorie != null) tags = String(b.kategorie).split(/[,;]/);
+  if (tags) { const t = tagsPruefen(tags); neu.tags = JSON.stringify(t); neu.kategorie = t[0] || ""; }
   if (b.menge != null) neu.menge = Math.max(0, zahl(b.menge) ?? 1);
   if (b.status && STATUS.includes(b.status)) neu.status = b.status;
   if (b.notizen != null) neu.notizen = text(b.notizen, 5000);
@@ -424,14 +479,36 @@ async function kontoGegenstaende(db, kontoId) {
   return r ? r.n : 0;
 }
 
-function sammlungAus(s) {
+function sammlungAus(s, gegenstaende = null, vorhanden = null) {
+  const da = vorhanden || (gegenstaende ? [...new Set(gegenstaende.flatMap(g => JSON.parse(g.tags || "[]")))] : []);
   return {
     id: s.id, name: s.name, vorlage: s.vorlage, felder: JSON.parse(s.felder || "[]"), sicht: s.sicht, slug: s.slug,
-    link_token: s.link_token, praefix: s.praefix, anzahl: s.anzahl, geaendert: s.geaendert,
+    link_token: s.link_token, praefix: s.praefix, anzahl: s.anzahl, geaendert: s.geaendert, pos: s.pos || 0,
+    tags: tagsDerSammlung(s, da),
   };
 }
 function gegenstandAus(g) {
-  return { ...g, werte: JSON.parse(g.werte || "{}"), fotos: JSON.parse(g.fotos || "[]") };
+  return { ...g, werte: JSON.parse(g.werte || "{}"), fotos: JSON.parse(g.fotos || "[]"), tags: JSON.parse(g.tags || "[]") };
+}
+// Tag-Liste säubern: Text, ≤ 40 Zeichen, ohne Doppelte (Groß/klein egal), höchstens 30
+function tagsPruefen(liste) {
+  const aus = [], gesehen = new Set();
+  for (const t of liste || []) {
+    const v = String(t == null ? "" : t).replace(/\s+/g, " ").trim().slice(0, 40);
+    if (!v || gesehen.has(v.toLowerCase())) continue;
+    gesehen.add(v.toLowerCase()); aus.push(v);
+    if (aus.length >= 30) break;
+  }
+  return aus;
+}
+// Vorschläge der Sammlung: gespeicherte Liste, sonst Vorlage; dazu alle Tags, die Gegenstände tragen
+function tagsDerSammlung(s, vorhanden = []) {
+  const basis = s.tags != null ? JSON.parse(s.tags || "[]") : (VORLAGEN[s.vorlage] || VORLAGEN.frei).kategorien;
+  return tagsPruefen([...basis, ...vorhanden]);
+}
+async function alleTags(db, sid) {
+  const { results } = await db.prepare("SELECT tags FROM gegenstaende WHERE sammlung_id = ?1").bind(sid).all();
+  return [...new Set((results || []).flatMap(r => JSON.parse(r.tags || "[]")))];
 }
 
 function meineSachen(k, se, url, s) {
@@ -455,14 +532,14 @@ function ortPfadText(orte, oid) {
 function csvAus(s, gegenstaende, orte, lang, origin) {
   const felder = JSON.parse(s.felder || "[]").filter(f => !f.aus);
   const kopf = lang === "en"
-    ? ["No.", "Name", "Category", "Place", "Quantity", "Status", ...felder.map(f => f.en), "Notes", "Photos"]
-    : ["Nr.", "Name", "Kategorie", "Ort", "Menge", "Status", ...felder.map(f => f.de), "Notizen", "Fotos"];
+    ? ["No.", "Name", "Tags", "Place", "Quantity", "Status", ...felder.map(f => f.en), "Notes", "Photos"]
+    : ["Nr.", "Name", "Tags", "Ort", "Menge", "Status", ...felder.map(f => f.de), "Notizen", "Fotos"];
   const zeilen = [kopf];
   for (const g of gegenstaende) {
     const w = JSON.parse(g.werte || "{}");
     const fotos = JSON.parse(g.fotos || "[]").map(f => `${origin}/f/${s.id}/${g.id}/${f}`).join(" ");
     zeilen.push([
-      s.praefix + "-" + String(g.nr).padStart(4, "0"), g.name, g.kategorie, ortPfadText(orte, g.ort_id), g.menge, g.status,
+      s.praefix + "-" + String(g.nr).padStart(4, "0"), g.name, JSON.parse(g.tags || "[]").join(", "), ortPfadText(orte, g.ort_id), g.menge, g.status,
       ...felder.map(f => (w[f.id] === true ? "ja" : w[f.id] === false ? "nein" : w[f.id] ?? "")), g.notizen, fotos,
     ]);
   }
@@ -487,7 +564,7 @@ async function oeffentlich(request, env, k, slug, url, lang) {
   const gesperrt = await k.gesperrteInhalte();
   if (gesperrt.has(s.id) && !v.besitzer) return new Response(lang === "en" ? "This collection has been blocked." : "Diese Sammlung wurde gesperrt.", { status: 410, headers: { "Content-Type": "text/plain; charset=utf-8" } });
   const [g, o] = await Promise.all([
-    env.DB.prepare("SELECT * FROM gegenstaende WHERE sammlung_id = ?1 AND status IN ('vorhanden','verliehen') ORDER BY nr").bind(s.id).all(),
+    env.DB.prepare("SELECT * FROM gegenstaende WHERE sammlung_id = ?1 AND status IN ('vorhanden','verliehen') ORDER BY pos, nr").bind(s.id).all(),
     env.DB.prepare("SELECT * FROM orte WHERE sammlung_id = ?1 ORDER BY pos, name").bind(s.id).all(),
   ]);
   if (!v.besitzer) await k.ereignis(null, "angesehen");

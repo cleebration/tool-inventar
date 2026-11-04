@@ -189,3 +189,54 @@ html[data-cleeb-ton=dunkel]{--m1:#26305a;--m2:#4a3420}
 .zahlfeld button{font:inherit;font-size:1.1rem;width:38px;height:38px;border-radius:50%;border:1px solid var(--line);background:transparent;color:inherit;cursor:pointer}
 .euro{position:relative;display:block}
 .euro::after{content:"€";position:absolute;right:12px;top:50%;transform:translateY(-50%);opacity:.5;pointer-events:none}
+
+/* ---------- Kacheln: ziehen und löschen (2026-11-04) ---------- */
+.karte.sammlung,.karte.ding{position:relative}
+.karte .griff{position:absolute;top:6px;left:6px;z-index:2;width:30px;height:30px;display:grid;place-items:center;border-radius:10px;font-size:.9rem;letter-spacing:-2px;
+  background:rgba(0,0,0,.42);color:#fff;cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none;opacity:0;transition:opacity .15s}
+.karte .weg{position:absolute;top:6px;right:6px;z-index:2;width:30px;height:30px;border:0;border-radius:50%;font:inherit;font-size:.85rem;line-height:1;
+  background:rgba(0,0,0,.42);color:#fff;cursor:pointer;opacity:0;transition:opacity .15s}
+.karte .weg:hover{background:#c62828}
+.karte:hover .griff,.karte:hover .weg,.karte:focus-within .griff,.karte:focus-within .weg{opacity:1}
+@media (hover:none){.karte .griff,.karte .weg{opacity:.85}}
+.liste .ding .griff{position:static;flex:none;margin-left:6px;opacity:.7;background:transparent;color:inherit}
+.liste .ding .weg{top:50%;transform:translateY(-50%);right:10px}
+.sammlungen .karte.sammlung:not(.neu){padding-top:40px}
+.karte.zieht{opacity:.75;outline:2px dashed var(--akzent);outline-offset:2px;transform:scale(1.02);z-index:5;cursor:grabbing}
+.beimZiehen,.beimZiehen *{cursor:grabbing!important;user-select:none;-webkit-user-select:none}
+.karte.sammlung,.karte.ding,.karte img{-webkit-user-drag:none;-webkit-touch-callout:none}
+.ding .bild{position:relative}
+.ding .anz{position:absolute;right:6px;bottom:6px;font-size:.72rem;padding:2px 7px;border-radius:999px;background:rgba(0,0,0,.55);color:#fff}
+.ding .tags{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}
+.ding .tags i{font-style:normal;font-size:.72rem;padding:1px 7px;border-radius:999px;background:var(--line);color:var(--ink2)}
+.chip.tag small{opacity:.65;margin-left:2px}
+.chip.tagan{display:inline-flex;align-items:center;gap:4px;padding-right:4px;cursor:default}
+.chip.tagan button{border:0;background:rgba(0,0,0,.18);color:inherit;width:22px;height:22px;border-radius:50%;cursor:pointer;font:inherit;font-size:.72rem;line-height:1}
+.knoepfe.rechts{justify-content:flex-end;margin-top:14px}
+#q-name{width:100%}
+
+/* ---------- Galerie im Editor + Großansicht ---------- */
+.galerie2{position:relative;border-radius:var(--r);overflow:hidden;background:var(--line);aspect-ratio:1/1;outline:none}
+.galerie2 .bahn,.lightbox .bahn{display:flex;width:100%;height:100%;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;overscroll-behavior-x:contain}
+.galerie2 .bahn::-webkit-scrollbar,.lightbox .bahn::-webkit-scrollbar{display:none}
+.galerie2 figure,.lightbox figure{flex:0 0 100%;margin:0;scroll-snap-align:center;scroll-snap-stop:always}
+.galerie2 figure img{width:100%;height:100%;object-fit:cover;display:block;cursor:zoom-in}
+.galerie2 .pf,.lightbox .pf{position:absolute;top:50%;transform:translateY(-50%);width:40px;height:40px;border:0;border-radius:50%;background:rgba(0,0,0,.45);color:#fff;font-size:26px;line-height:1;cursor:pointer;z-index:2}
+.galerie2 .pf.l,.lightbox .pf.l{left:8px}.galerie2 .pf.r,.lightbox .pf.r{right:8px}
+.galerie2 .pf[hidden],.lightbox .pf[hidden],.galerie2 [hidden]{display:none}
+.galerie2 .ueber2{position:absolute;inset:auto 8px 8px 8px;display:flex;gap:6px;align-items:center;z-index:2}
+.galerie2 .ueber2 > *{font:inherit;font-size:.8rem;border:0;border-radius:999px;padding:6px 10px;background:rgba(0,0,0,.55);color:#fff;-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+.galerie2 .ueber2 .zaehler:empty{display:none}
+.galerie2 .ueber2 button{cursor:pointer;min-width:32px}
+.galerie2 .ueber2 #fTitel{margin-left:auto}.galerie2 .ueber2 .titelmarke:not([hidden]) ~ #fGross{margin-left:auto}
+.daumen{display:flex;gap:8px;margin-top:8px;overflow-x:auto;scrollbar-width:thin;padding-bottom:2px}
+.daumen button{flex:0 0 64px;height:64px;padding:0;border:2px solid transparent;border-radius:12px;overflow:hidden;background:var(--line);cursor:pointer}
+.daumen button[aria-current=true]{border-color:var(--akzent)}
+.daumen img{width:100%;height:100%;object-fit:cover;display:block}
+dialog.lightbox{padding:0;border:0;width:100vw;height:100vh;max-width:none;max-height:none;background:rgba(8,10,14,.94);color:#fff}
+dialog.lightbox::backdrop{background:rgba(8,10,14,.9)}
+.lightbox figure{display:grid;place-items:center;height:100%}
+.lightbox figure img{max-width:100%;max-height:100%;object-fit:contain}
+.lightbox .x{position:absolute;top:12px;right:12px;width:42px;height:42px;border:0;border-radius:50%;background:rgba(255,255,255,.14);color:#fff;font:inherit;font-size:1.1rem;cursor:pointer;z-index:3}
+.lightbox .zaehler{position:absolute;bottom:14px;left:50%;transform:translateX(-50%);padding:3px 12px;border-radius:999px;background:rgba(255,255,255,.14);font-size:.85rem}
+.chip[aria-pressed=true] small{color:inherit;opacity:.8}
