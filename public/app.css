@@ -14,7 +14,7 @@
 }}
 html[data-cleeb-ton=dunkel]{--bg:#0F1218; --ink:#EEF1F6; --ink2:#AAB2C0; --line:rgba(255,255,255,.10); --akzent:#6F8BFF; --akzent-ink:#0B0E14; --gefahr:#FF8A80; color-scheme:dark}
 *{box-sizing:border-box}
-html,body{margin:0;background:var(--cleeb-hintergrund, var(--bg));color:var(--cleeb-text, var(--ink));font:16px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif;-webkit-font-smoothing:antialiased}
+html,body{margin:0;background:var(--cleeb-hintergrund, var(--bg));color:var(--ink);font:16px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif;-webkit-font-smoothing:antialiased}
 body{min-height:100vh;background-image:radial-gradient(600px 400px at 0% 0%, rgba(120,150,255,.18), transparent 70%),radial-gradient(500px 400px at 100% 20%, rgba(255,180,120,.14), transparent 70%);background-attachment:fixed}
 main{max-width:1180px;margin:0 auto;padding:16px 16px 64px}
 a{color:var(--akzent)}
@@ -133,3 +133,6 @@ cleebration-leiste svg,.chip svg{width:20px;height:20px;fill:none;stroke:current
 .chip.ansicht svg{width:18px;height:18px}
 .knoepfe{flex-wrap:wrap}
 .knoepfe > .knopf{flex:1 1 auto;justify-content:center}
+
+/* Text auf Glas-Flächen folgt der Leiste (Grundsatz 9); Text direkt auf dem Seiten-Hintergrund folgt hell/dunkel */
+.karte,.felder,.chip:not([aria-pressed=true]):not(.an),.knopf.leise,#gespeichert,dialog.fenster,.wahl{color:var(--cleeb-text, var(--ink))}
