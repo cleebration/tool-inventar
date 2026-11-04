@@ -36,7 +36,7 @@ npm test        # Syntax + wrangler dev mit lokaler D1/R2 + nachgebauter Store (
 ```
 
 ## Live schalten (Freigabe Chris)
-1. D1 `inventar` und R2 `inventar-fotos` anlegen, `database_id` in `wrangler.jsonc` eintragen, Migrationen: `npx wrangler d1 migrations apply inventar --remote`.
+1. ~~D1 `inventar` und R2 `inventar-fotos` anlegen, `database_id` eintragen, Migrationen~~ – erledigt 2026-11-04 (D1 `417c04fe-…`, Westeuropa; R2 `inventar-fotos`; `d1_migrations` kennt 0001+0002).
 2. Store `/admin`: Produkt + Tool `inventar` (Art Konto-Tool), Tool-Schlüssel → Secret `STORE_SCHLUESSEL` im Worker; Sets Basis (gratis) und Plus (19 €/Jahr, Schalter „bezahlt“ ab Verkaufsstart); Werte wie oben.
 3. Cloudflare Workers Builds mit diesem Repo verbinden (Push auf `main` deployt), Custom Domain `inventar.cleebration.com`.
 4. Kachel-Check, mit beiden Konten prüfen, Kachel sichtbar schalten.

@@ -18,8 +18,8 @@
     {
       "binding": "DB",
       "database_name": "inventar",
-      // ID nach „wrangler d1 create inventar“ eintragen (Freigabe Deploy)
-      "database_id": "00000000-0000-0000-0000-000000000000",
+      // angelegt 2026-11-04 (Westeuropa), Migrationen 0001+0002 eingespielt
+      "database_id": "417c04fe-86a8-4b96-9f81-6db3886a2565",
       "migrations_dir": "migrations"
     }
   ],
