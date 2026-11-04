@@ -1,0 +1,39 @@
+/* Öffentliche Ansicht einer Sammlung – gleiche Glas-Sprache wie die App */
+:root{--bg:#E9EDF3;--ink:#14161A;--ink2:#4A5060;--line:rgba(20,22,26,.09);--glas:var(--cleeb-glas,rgba(255,255,255,.68));--rand:var(--cleeb-rand,rgba(255,255,255,.9));--akzent:#2A47C9;--akzent-ink:#fff;--r:22px;color-scheme:light}
+@media (prefers-color-scheme:dark){:root:not([data-cleeb-ton=hell]){--bg:#0F1218;--ink:#EEF1F6;--ink2:#AAB2C0;--line:rgba(255,255,255,.10);--glas:var(--cleeb-glas,rgba(30,35,46,.64));--rand:var(--cleeb-rand,rgba(255,255,255,.10));--akzent:#6F8BFF;--akzent-ink:#0B0E14;color-scheme:dark}}
+html[data-cleeb-ton=dunkel]{--bg:#0F1218;--ink:#EEF1F6;--ink2:#AAB2C0;--line:rgba(255,255,255,.10);--akzent:#6F8BFF;--akzent-ink:#0B0E14;color-scheme:dark}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--cleeb-hintergrund,var(--bg));color:var(--cleeb-text,var(--ink));font:16px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif}
+main{max-width:1180px;margin:0 auto;padding:16px 16px 48px}
+.kopf h1{font-size:clamp(1.5rem,3.4vw,2.2rem);margin:8px 0 2px}
+.kopf p{margin:0 0 8px;color:var(--ink2)}
+.hinweis{padding:8px 12px;border-radius:12px;background:var(--glas);border:1px solid var(--rand);display:inline-block}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0 16px}
+.chips button{font:inherit;font-size:.86rem;padding:6px 12px;border-radius:999px;border:1px solid var(--rand);background:var(--glas);color:inherit;cursor:pointer}
+.chips button[aria-pressed=true]{background:var(--akzent);color:var(--akzent-ink);border-color:transparent}
+.raster{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:14px}
+@media (min-width:700px){.raster{grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:18px}}
+.karte{display:flex;flex-direction:column;border-radius:var(--r);overflow:hidden;background:var(--glas);border:1px solid var(--rand);box-shadow:0 10px 30px rgba(28,40,70,.10);-webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px)}
+.karte[hidden]{display:none}
+.karte .bild{all:unset;cursor:zoom-in;aspect-ratio:1/1;display:grid;place-items:center;background:var(--line);overflow:hidden}
+.karte .bild img{width:100%;height:100%;object-fit:cover;display:block}
+.ohne{font-size:2.6rem;opacity:.5}
+.text{padding:10px 12px 14px}
+.text h2{font-size:1rem;margin:0 0 2px;line-height:1.25}
+.meta{margin:0 0 6px;font-size:.84rem;color:var(--ink2)}
+dl{margin:0;display:grid;gap:2px;font-size:.86rem}
+dl .z{display:flex;gap:6px}
+dt{color:var(--ink2);flex:none}
+dt::after{content:":"}
+dd{margin:0}
+.leer{color:var(--ink2);text-align:center;padding:40px 0}
+.melden{margin-top:32px;font-size:.86rem;color:var(--ink2)}
+.melden summary{cursor:pointer}
+.melden form{display:flex;flex-direction:column;gap:8px;max-width:420px;margin-top:8px}
+.melden select,.melden textarea{font:inherit;color:inherit;background:rgba(127,127,127,.08);border:1px solid var(--line);border-radius:10px;padding:8px}
+.melden button{align-self:flex-start;font:inherit;padding:8px 14px;border-radius:999px;border:0;background:var(--akzent);color:var(--akzent-ink);cursor:pointer}
+dialog{border:0;border-radius:24px;padding:12px;max-width:min(900px,calc(100vw - 20px));max-height:calc(100vh - 40px);background:var(--glas);color:inherit;-webkit-backdrop-filter:blur(24px);backdrop-filter:blur(24px)}
+dialog::backdrop{background:rgba(10,12,18,.6)}
+dialog img{display:block;max-width:100%;max-height:70vh;margin:0 auto 10px;border-radius:14px}
+dialog .x{position:sticky;top:0;float:right;font:inherit;width:36px;height:36px;border-radius:50%;border:0;background:var(--line);color:inherit;cursor:pointer}
+cleebration-leiste > input[type=search]{all:unset;box-sizing:border-box;width:100%;min-width:60px;height:36px;padding:0 12px;font:inherit;font-size:.95rem;color:inherit}

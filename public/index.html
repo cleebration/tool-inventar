@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Inventar · cleebration</title>
+<meta name="description" content="Alles, was du besitzt: mit Foto, Ort und QR-Code wiederfinden, zeigen und bewerten.">
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/app.css">
+<script src="https://store.cleebration.com/leiste.js" defer></script>
+<script src="https://store.cleebration.com/kit.js" data-produkt="inventar" defer></script>
+<script src="/app.js" defer></script>
+</head>
+<body>
+<cleebration-leiste tool="inventar" anmelden="/anmelden" abmelden="/abmelden">
+  <input data-icon="suche" data-icon-breit title="Suchen" id="w-suche" type="search" placeholder="Suchen" hidden>
+  <button data-icon="neu" title="Neu" id="w-neu" type="button" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
+  <button data-icon="orte" title="Orte" id="w-orte" type="button" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21Z"/><circle cx="12" cy="9.5" r="2.5"/></svg></button>
+  <button data-icon="teilen" title="Teilen" id="w-teilen" type="button" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12M7 8l5-5 5 5"/><path d="M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/></svg></button>
+  <button data-icon="sammlung" title="Sammlung" id="w-sammlung" type="button" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h10"/><circle cx="18" cy="17" r="2.2"/></svg></button>
+</cleebration-leiste>
+<main id="app" aria-live="polite"></main>
+<div id="gespeichert" role="status" hidden></div>
+<cleebration-fuss produkt="inventar" name="Inventar" eigen="Eigenes Inventar gratis erstellen"></cleebration-fuss>
+<input type="file" id="w-foto" accept="image/*" capture="environment" hidden>
+<input type="file" id="w-fotoGalerie" accept="image/*" multiple hidden>
+<input type="file" id="w-datei" accept=".csv,.tsv,.txt,.xlsx,.xls" hidden>
+</body>
+</html>

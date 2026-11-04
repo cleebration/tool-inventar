@@ -1,0 +1,31 @@
+{
+  // Tool Inventar – Cloudflare Worker mit statischer App, D1 und R2 (Vorbild: Adventkalender/Einladung)
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "tool-inventar",
+  "main": "src/worker.js",
+  "compatibility_date": "2026-10-01",
+  "workers_dev": true,
+  "routes": [
+    { "pattern": "inventar.cleebration.com", "custom_domain": true }
+  ],
+  "observability": { "enabled": true },
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    "run_worker_first": true
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "inventar",
+      // ID nach „wrangler d1 create inventar“ eintragen (Freigabe Deploy)
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "r2_buckets": [
+    { "binding": "FOTOS", "bucket_name": "inventar-fotos" }
+  ],
+  // nachts: abgelaufene Sitzungen + gelöschte Konten aufräumen (DSGVO, Kit)
+  "triggers": { "crons": ["17 3 * * *"] }
+}
