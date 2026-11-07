@@ -25,7 +25,7 @@
       an: "an", oeff: "öffentlich", typ: { text: "Text", lang: "Langtext", zahl: "Zahl", datum: "Datum", janein: "Ja/Nein" },
       sammlungLoeschen: "Sammlung löschen", loeschenFrage: "Zum Löschen den Namen der Sammlung eintippen:", ja: "ja", nein: "nein",
       grenze: { sammlungen: "Mehr Sammlungen gibt es mit Inventar Plus.", gegenstaende: "Mehr Gegenstände gibt es mit Inventar Plus.", fotos: "Mehr Fotos je Gegenstand gibt es mit Inventar Plus." },
-      zumStore: "Im Store ansehen", qr: "QR-Code", qrOrt: "QR für diesen Ort – aufkleben, scannen, Inhalt sehen", qrDing: "QR für diesen Gegenstand",
+      zumStore: "Im Store ansehen", qr: "QR-Code", qrOrt: "QR für diesen Ort – aufkleben, scannen, Inhalt sehen", qrDing: "QR für diesen Gegenstand", etiketten: "Etiketten drucken", etikettenOrt: "Etikett für diesen Ort drucken (Tool Etiketten)", etikettenMax: "Es werden die ersten %n übergeben.",
       inOrt: "Inhalt von", ansicht: "Kacheln / Liste", namePlatz: "Wie heißt der Gegenstand?", eigene: "eigene", ortNeuPlatz: "z. B. Wohnzimmer", anlegen: "Anlegen", details: "Details", wertBelege: "Wert, Kauf & Versicherung", fotoHier: "Foto hinzufügen", wert: "Gesamt-Schätzwert", laedt: "Lädt …", foto: "Foto", fotoLaedt: "Foto wird hochgeladen …",
       tags: "Tags", tagNeu: "＋ Tag", tagsVerwalten: "Tags der Sammlung", tagWegFrage: "Tag „%s“ löschen? Er verschwindet auch bei allen Gegenständen.", ziehen: "Ziehen zum Verschieben",
       sammlungWegFrage: "Sammlung „%s“ löschen?", sammlungWegMit: "Sie enthält %n Gegenstände mit allen Fotos. Zum Bestätigen den Namen eintippen:", endgueltig: "Endgültig löschen", abbrechen: "Abbrechen",
@@ -48,7 +48,7 @@
       an: "on", oeff: "public", typ: { text: "Text", lang: "Long text", zahl: "Number", datum: "Date", janein: "Yes/No" },
       sammlungLoeschen: "Delete collection", loeschenFrage: "Type the collection's name to delete it:", ja: "yes", nein: "no",
       grenze: { sammlungen: "More collections with Inventory Plus.", gegenstaende: "More items with Inventory Plus.", fotos: "More photos per item with Inventory Plus." },
-      zumStore: "See in store", qr: "QR code", qrOrt: "QR for this place – stick it on, scan, see contents", qrDing: "QR for this item",
+      zumStore: "See in store", qr: "QR code", qrOrt: "QR for this place – stick it on, scan, see contents", qrDing: "QR for this item", etiketten: "Print labels", etikettenOrt: "Print a label for this place (Labels tool)", etikettenMax: "Only the first %n are handed over.",
       inOrt: "Contents of", ansicht: "Grid / list", namePlatz: "What is it called?", eigene: "custom", ortNeuPlatz: "e.g. Living room", anlegen: "Add", details: "Details", wertBelege: "Value, purchase & insurance", fotoHier: "Add photo", wert: "Total estimate", laedt: "Loading …", foto: "Photo", fotoLaedt: "Uploading photo …",
       tags: "Tags", tagNeu: "＋ Tag", tagsVerwalten: "Collection tags", tagWegFrage: "Delete tag “%s”? It is removed from all items too.", ziehen: "Drag to move",
       sammlungWegFrage: "Delete collection “%s”?", sammlungWegMit: "It contains %n items with all photos. Type the name to confirm:", endgueltig: "Delete for good", abbrechen: "Cancel",
@@ -285,6 +285,20 @@
   function feldName(f) { return L === "en" ? f.en : f.de; }
   function nrText(g) { return (S.akt.sammlung.praefix || "INV") + "-" + String(g.nr).padStart(4, "0"); }
 
+  /* ---------- Etiketten drucken (Auftrag 44): Liste geht im Browser an Tool Etiketten, Daten bleiben hier ---------- */
+  function etikettenOeffnen(titel, eintraege) {
+    if (!eintraege.length || !window.etikettenLink) return;
+    if (eintraege.length > window.etikettenLink.MAX) toast(fmt(T.etikettenMax, null, window.etikettenLink.MAX));
+    // neuer Tab ohne Rückgriff auf dieses Fenster (rel=noopener); window.open(…, "noopener") liefert immer null
+    var a = document.createElement("a");
+    a.href = window.etikettenLink(titel, eintraege); a.target = "_blank"; a.rel = "noopener";
+    document.body.appendChild(a); a.click(); a.remove();
+    if (window.cleeb) cleeb.ereignis("etiketten");
+  }
+  function ortEintrag(o, sid) {
+    return { nr: "", name: o.name, ort: ortPfad(o.eltern_id), link: location.origin + "/#/s/" + sid + "?ort=" + o.id };
+  }
+
   function zeichneSammlung() {
     var j = S.akt, s = j.sammlung, q = (W.suche.value || "").toLowerCase().trim();
     var orte = S.filter.o ? ortNachkommen(S.filter.o) : null;
@@ -310,7 +324,8 @@
 
     app.innerHTML =
       '<header class="kopf"><h1 class="titel">' + esc(S.filter.o ? T.inOrt + " " + ortPfad(S.filter.o) : s.name) + '</h1><p class="zahl">' + liste.length + " " + esc(T.gegenstaende) +
-      (hatWert ? " · " + esc(T.wert) + " " + wertSumme.toLocaleString(L === "en" ? "en-GB" : "de-AT", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }) : "") + "</p>" +
+      (hatWert ? " · " + esc(T.wert) + " " + wertSumme.toLocaleString(L === "en" ? "en-GB" : "de-AT", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }) : "") +
+      (liste.length ? ' <button type="button" class="knopf leise klein" id="etiketten">🏷 ' + esc(T.etiketten) + "</button>" : "") + "</p>" +
       '<nav class="chips">' +
         (S.filter.o ? '<button type="button" class="chip an" data-f="o" data-w="">📍 ' + esc(ortPfad(S.filter.o)) + " ✕</button>" : "") +
         (tags.length ? '<button type="button" class="chip" data-tag="" aria-pressed="' + !S.filter.t.length + '">' + esc(T.alle) + "</button>" + tags.map(tagChip).join("") : "") +
@@ -334,6 +349,12 @@
     [].forEach.call(app.querySelectorAll(".chip[data-tag]"), function (b) {
       b.onclick = function () { var t = b.dataset.tag, i = S.filter.t.indexOf(t); if (!t) S.filter.t = []; else if (i < 0) S.filter.t.push(t); else S.filter.t.splice(i, 1); zeichneSammlung(); };
     });
+    var etk = app.querySelector("#etiketten");
+    if (etk) etk.onclick = function () {
+      etikettenOeffnen(S.filter.o ? ortPfad(S.filter.o) : s.name, liste.map(function (g) {
+        return { nr: nrText(g), name: g.name, ort: ortPfad(g.ort_id), link: location.origin + "/#/s/" + s.id + "/g/" + g.id };
+      }));
+    };
     var box = app.querySelector("section.dinge");
     if (!box) return;
     box.addEventListener("click", function (e) {
@@ -594,7 +615,7 @@
         return '<li style="--tiefe:' + x.tiefe + '" data-o="' + esc(x.o.id) + '"><input value="' + esc(x.o.name) + '" aria-label="' + esc(T.name) + '">' +
           '<select title="' + esc(T.liegtIn) + '">' + ortOptionen(x.o.eltern_id, ortNachkommen(x.o.id)) + "</select>" +
           '<a class="zahl" href="#/s/' + s.id + "?ort=" + esc(x.o.id) + '">' + n + "</a>" +
-          '<button type="button" data-a="dazu" title="' + esc(T.ortNeu + " " + T.darunter) + '">＋</button><button type="button" data-a="qr" title="' + esc(T.qr) + '">▣</button><button type="button" data-a="weg" title="' + esc(T.loeschen) + '">✕</button></li>';
+          '<button type="button" data-a="dazu" title="' + esc(T.ortNeu + " " + T.darunter) + '">＋</button><button type="button" data-a="qr" title="' + esc(T.qr) + '">▣</button><button type="button" data-a="etk" title="' + esc(T.etikettenOrt) + '">🏷</button><button type="button" data-a="weg" title="' + esc(T.loeschen) + '">✕</button></li>';
       }).join("") + '</ul><button type="button" class="knopf" id="ortNeu">＋ ' + esc(T.ortNeu) + "</button>";
       [].forEach.call(d.querySelectorAll("li[data-o]"), function (li) {
         var oid = li.dataset.o, o = S.akt.orte.find(function (x) { return x.id === oid; }), t;
@@ -605,6 +626,7 @@
         };
         li.querySelector('[data-a="dazu"]').onclick = function () { neu(oid); };
         li.querySelector('[data-a="qr"]').onclick = function () { qrZeigen(T.qrOrt, location.origin + "/#/s/" + s.id + "?ort=" + oid, "ort-" + o.name); };
+        li.querySelector('[data-a="etk"]').onclick = function () { etikettenOeffnen(o.name, [ortEintrag(o, s.id)]); };
         li.querySelector('[data-a="weg"]').onclick = function () {
           if (!confirm(T.ortLoeschen)) return;
           api("/sammlungen/" + s.id + "/orte/" + oid, { method: "DELETE" }).then(function () {

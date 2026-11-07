@@ -12,6 +12,7 @@ Konzept, Preise und Stand: Google Drive `1! claude/05 Projekte/Tool Inventar` (K
 - **Orte** als Baum (Haus → Raum → Regal → Box); QR-Code je Ort und je Gegenstand (`<cleebration-qr>`). Ort löschen: Inhalt rückt eine Ebene hoch.
 - **Suche, Filter** (Kategorie, Ort inkl. Unter-Orte, Status), Kacheln/Liste, Gesamt-Schätzwert.
 - **Import** CSV/Excel mit Spalten-Zuordnung (Orts-Pfad „Haus / Keller / Regal 2“ legt Orte an, unbekannte Spalten → neue Felder); **Export** CSV (Semikolon + BOM, öffnet in Excel direkt).
+- **Etiketten drucken** (Leitstand-Auftrag 44, „ok Kartons über Inventar“ 2026-11-07): Knopf „🏷 Etiketten drucken“ in der Sammlung (auch gefiltert nach Ort) und 🏷 je Ort im Orte-Fenster. Die Liste (Nr, Name, Ort, QR-Adresse ins Inventar) geht **im Browser** an Tool Etiketten: `https://etiketten.cleebration.com/#inventar=<base64url-JSON>` (`public/etiketten-link.js`; der `#`-Teil erreicht keinen Server, kein Tool-zu-Tool-Server, höchstens 500 Einträge). Karton-Daten und Grenzen bleiben nur hier; Etiketten druckt nur die Aufkleber (Vorlage „Karton“, Zweckform 3481/3490, A4-Einzeletikett). Der QR führt direkt zum Gegenstand bzw. Ort hier.
 - **Teilen**: privat · mit Link (Token, `noindex`) · öffentlich – Seite `/o/<adresse>`. Öffentlich nie: Felder ohne 👁, Notizen, Orte tiefer als 2 Ebenen, verkaufte/weg. Besucher können melden (→ Meldungen-Inbox im Store).
 
 ## Aufbau
@@ -32,6 +33,7 @@ API (nur angemeldet, schreibend nur mit passender Herkunft):
 ## Testen (lokal, ohne Cloudflare-Konto)
 ```
 npm i
+node scripts/etiketten.test.mjs   # Übergabe an Etiketten, ohne Pakete (läuft auch in npm run check)
 npm test        # Syntax + wrangler dev mit lokaler D1/R2 + nachgebauter Store (scripts/fake-store.mjs), 15 Prüfungen mit beiden Konten chris/chrisnate
 ```
 
