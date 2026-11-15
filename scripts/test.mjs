@@ -34,9 +34,9 @@ const jpeg = () => { const b = new Uint8Array(5000); b[0] = 0xff; b[1] = 0xd8; b
 
 const nate = browser(), chris = browser(), gast = browser();
 
-await pruef("ohne Anmeldung → /anmelden", async () => {
+await pruef("ohne Anmeldung → Vorschau-Seite mit og-Tags + Weiterleitung (Auftrag 225)", async () => {
   const r = await gast.go("/");
-  assert.equal(r.status, 302); assert.match(r.headers.get("location"), /\/anmelden\?zurueck=/);
+  assert.equal(r.status, 200); const t = await r.text(); assert.match(t, /og:image/); assert.match(t, /http-equiv="refresh" content="0;url=[^"]*\/anmelden\?zurueck=/);
   assert.equal((await gast.go("/api/start")).status, 401);
 });
 

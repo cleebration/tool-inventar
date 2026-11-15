@@ -20,6 +20,35 @@ const text = (v, n = 200) => String(v == null ? "" : v).slice(0, n);
 const zahl = v => (v === "" || v == null || isNaN(+v) ? null : +v);
 const fehler = (status, f) => json(status, { fehler: f });
 
+// Auftrag 225 (wie 96 bei tool-einladung): Ohne Anmeldung leitete "/" per 302 zur Anmeldung – Link-Vorschauen
+// (WhatsApp, Mail, iMessage) sahen so keine og-Tags. Jetzt: kleine Seite mit og-Tags und sofortiger Weiterleitung.
+const OG225 = { titel: 'Inventar · cleebration', text: 'Alles, was du besitzt: mit Foto, Ort und QR-Code wiederfinden, zeigen und bewerten.', bild: "https://store.cleebration.com/og/store.png", url: "https://inventar.cleebration.com/" };
+function ogVorschau225(antwort) {
+  if (!antwort || antwort.status < 300 || antwort.status > 399) return antwort;
+  const x = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  const ziel = antwort.headers.get("Location") || "/anmelden";
+  const html = `<!doctype html><html lang="de"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${x(OG225.titel)}</title>
+<meta name="robots" content="noindex">
+<meta name="description" content="${x(OG225.text)}">
+<meta property="og:title" content="${x(OG225.titel)}">
+<meta property="og:description" content="${x(OG225.text)}">
+<meta property="og:type" content="website">
+<meta property="og:url" content="${x(OG225.url)}">
+<meta property="og:image" content="${OG225.bild}">
+<meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="${OG225.bild}">
+<link rel="icon" href="/icon.svg">
+<meta http-equiv="refresh" content="0;url=${x(ziel)}">
+</head><body><p><a href="${x(ziel)}">Weiter zur Anmeldung …</a></p></body></html>`;
+  const h = new Headers(antwort.headers); h.delete("Location");
+  h.set("Content-Type", "text/html; charset=utf-8"); h.set("Cache-Control", "no-store");
+  return new Response(html, { status: 200, headers: h });
+}
+const istStart225 = (request) => { const p = new URL(request.url).pathname; return p === "/" || p === "/index.html"; };
+
 export default {
   async fetch(request, env, ctx) {
     const k = kit({ tool: TOOL, env });
@@ -82,7 +111,7 @@ async function weiter(request, env, ctx, k) {
     if (!k.herkunftOk(request)) return fehler(403, "Herkunft");
     return api(request, env, ctx, k, se, url, lang);
   }
-  if (!se) return k.zurAnmeldung(request);
+  if (!se) return istStart225(request) ? ogVorschau225(await k.zurAnmeldung(request)) : k.zurAnmeldung(request);
   if (!se.name) return k.zurNamenswahl(request);
 
   // App-Hülle (eine Seite, Routen im Hash) – Sprache und Name serverseitig eintragen
